@@ -6,6 +6,7 @@ import { MeasurementOutput } from './components/MeasurementOutput';
 import { ToolsAndGuidance } from './components/ToolsAndGuidance';
 import { WallDimensions, ShelfDimensions, Obstruction, ProjectSettings, CalculationResult } from './types';
 import { validateInputs, calculateOptimalPlacement } from './utils/calculations';
+import boltLogo from './assets/black_circle_360x360.png';
 
 function App() {
   const [wall, setWall] = useState<WallDimensions>({ width: 96, height: 96 });
@@ -41,14 +42,19 @@ function App() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <Calculator className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <Calculator className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Spot On Shelves</h1>
+                <p className="text-gray-600">Plan and hang shelves with precision and confidence</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Spot On Shelves</h1>
-              <p className="text-gray-600">Plan and hang shelves with precision and confidence</p>
-            </div>
+            <a href="https://bolt.new/" target="_blank" rel="noopener noreferrer">
+              <img src={boltLogo} alt="Built with bolt.new" className="h-16 w-16" />
+            </a>
           </div>
         </div>
       </header>
