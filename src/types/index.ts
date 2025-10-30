@@ -49,3 +49,12 @@ export interface ProjectSettings {
   mountingType: MountingType;
   alignment: Alignment;
 }
+
+// Material estimate returned by the material calculator
+export interface MaterialEstimate {
+  brackets: number;
+  screws: number;
+  anchors: number;
+  anchorType: string;
+  notes?: string;
+}

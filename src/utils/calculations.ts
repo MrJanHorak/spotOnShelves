@@ -1,4 +1,4 @@
-import { WallDimensions, ShelfDimensions, Obstruction, ShelfPlacement, CalculationResult, Alignment } from '../types';
+import { WallDimensions, ShelfDimensions, Obstruction, ShelfPlacement, CalculationResult, Alignment, MaterialEstimate, MountingType, WallMaterial } from '../types';
 
 export function validateInputs(
   wall: WallDimensions,
@@ -79,7 +79,7 @@ export function calculateOptimalPlacement(
   
   let currentY = wallMargin + (remainingSpace / 2); // Start from middle positioning
 
-  sortedShelves.forEach((shelf, index) => {
+  sortedShelves.forEach((shelf) => {
     let bestX = wallMargin;
 
     // Calculate horizontal position based on alignment
@@ -186,4 +186,59 @@ export function convertUnits(value: number, fromUnit: 'inches' | 'cm', toUnit: '
 
 export function formatMeasurement(value: number, unit: 'inches' | 'cm'): string {
   return `${value.toFixed(1)} ${unit === 'inches' ? 'in' : 'cm'}`;
+}
+
+// Material calculator: estimates brackets, screws and anchors needed
+export function calculateMaterials(
+  shelves: ShelfDimensions[] | ShelfPlacement[],
+  wallMaterial: WallMaterial,
+  mountingType: MountingType
+): MaterialEstimate {
+  // Determine brackets needed per shelf based on width and mounting style
+  const bracketsForWidth = (width: number) => {
+    if (mountingType === 'floating') {
+      if (width <= 36) return 2;
+      if (width <= 72) return 3;
+      return Math.max(3, Math.ceil(width / 36));
+    }
+
+    if (mountingType === 'bracketed') {
+      return width <= 48 ? 2 : 3;
+    }
+
+    // l-bracket or default
+    return 2;
+  };
+
+  const screwsPerBracket = 2;
+  const anchorsPerBracket = 1; // assume one anchor per bracket when not into studs
+
+  const totalBrackets = shelves.reduce((sum, s) => sum + bracketsForWidth(s.width), 0);
+  const totalScrews = totalBrackets * screwsPerBracket;
+  const totalAnchors = totalBrackets * anchorsPerBracket;
+
+  const anchorType = (() => {
+    switch (wallMaterial) {
+      case 'drywall':
+        return 'Drywall anchors (toggle or heavy-duty) or mount into studs';
+      case 'plaster':
+        return 'Plaster anchors (molly/toggle) or mount into studs';
+      case 'concrete':
+        return 'Concrete/masonry anchors (use hammer drill)';
+      case 'brick':
+        return 'Brick anchors (drill into brick, not mortar)';
+      default:
+        return 'Use appropriate anchors for your wall type';
+    }
+  })();
+
+  const notes = `Calculated for mounting type: ${mountingType}. If mounting into studs, reduce anchors and use screws into studs instead.`;
+
+  return {
+    brackets: totalBrackets,
+    screws: totalScrews,
+    anchors: totalAnchors,
+    anchorType,
+    notes
+  };
 }

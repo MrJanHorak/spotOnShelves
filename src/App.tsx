@@ -15,6 +15,7 @@ import {
   validateInputs,
   calculateOptimalPlacement,
 } from './utils/calculations';
+import { MaterialCalculator } from './components/MaterialCalculator';
 import boltLogo from './assets/black_circle_360x360.png';
 
 function App() {
@@ -137,6 +138,9 @@ function App() {
 
               {/* Measurement Output */}
               <MeasurementOutput result={result} unit={settings.unit} />
+
+              {/* Material Calculator */}
+              <MaterialCalculator placedShelves={result.shelves} settings={settings} />
             </>
           )}
 
