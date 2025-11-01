@@ -233,22 +233,29 @@ export function MaterialCalculator({
             const pdfLib: any = await import('pdf-lib');
             const { PDFDocument } = pdfLib;
 
-            const container = document.getElementById('schematic-container') as HTMLElement | null;
+            const container = document.getElementById(
+              'schematic-container'
+            ) as HTMLElement | null;
             if (!container) return alert('Schematic not found');
 
-            const resSel = document.getElementById('export-resolution') as HTMLSelectElement | null;
+            const resSel = document.getElementById(
+              'export-resolution'
+            ) as HTMLSelectElement | null;
             let scale = window.devicePixelRatio || 1;
-            if (resSel && resSel.value !== 'device') scale = Number(resSel.value) || 1;
+            if (resSel && resSel.value !== 'device')
+              scale = Number(resSel.value) || 1;
 
             const canvas = await captureSchematic(scale);
             const pngDataUrl = canvas.toDataURL('image/png');
             const pngBuffer = await (await fetch(pngDataUrl)).arrayBuffer();
 
             // filename with project name and timestamp
-            const projectName = ((settings as any)?.name || (settings as any)?.projectName) || 'project';
+            const projectName =
+              (settings as any)?.name ||
+              (settings as any)?.projectName ||
+              'project';
             const ts = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `${projectName}-schematic-${ts}.pdf`;
-
 
             // create pdf and embed png using canvas pixel dimensions so it matches the PNG
             const pdfDoc = await PDFDocument.create();
@@ -277,18 +284,26 @@ export function MaterialCalculator({
             const pdfLib: any = await import('pdf-lib');
             const { PDFDocument, StandardFonts } = pdfLib;
 
-            const container = document.getElementById('schematic-container') as HTMLElement | null;
+            const container = document.getElementById(
+              'schematic-container'
+            ) as HTMLElement | null;
             if (!container) return alert('Schematic not found');
 
-            const resSel = document.getElementById('export-resolution') as HTMLSelectElement | null;
+            const resSel = document.getElementById(
+              'export-resolution'
+            ) as HTMLSelectElement | null;
             let scale = window.devicePixelRatio || 1;
-            if (resSel && resSel.value !== 'device') scale = Number(resSel.value) || 1;
+            if (resSel && resSel.value !== 'device')
+              scale = Number(resSel.value) || 1;
 
             const canvas = await captureSchematic(scale);
             const pngDataUrl = canvas.toDataURL('image/png');
             const pngBuffer = await (await fetch(pngDataUrl)).arrayBuffer();
 
-            const projectName = ((settings as any)?.name || (settings as any)?.projectName) || 'project';
+            const projectName =
+              (settings as any)?.name ||
+              (settings as any)?.projectName ||
+              'project';
             const ts = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `${projectName}-schematic-with-table-${ts}.pdf`;
 
@@ -305,7 +320,12 @@ export function MaterialCalculator({
             const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
             const fontSizeTitle = 14;
             let y = pageH - 40;
-            page2.drawText('Material Estimate', { x: 20, y, size: fontSizeTitle, font });
+            page2.drawText('Material Estimate', {
+              x: 20,
+              y,
+              size: fontSizeTitle,
+              font,
+            });
             y -= 30;
 
             const fontSize = 10;
@@ -323,10 +343,30 @@ export function MaterialCalculator({
                 y = pageH - 40;
               }
               page2.drawText(String(r.id), { x: 20, y, size: fontSize, font });
-              page2.drawText(String(r.width), { x: 160, y, size: fontSize, font });
-              page2.drawText(String(r.brackets), { x: 300, y, size: fontSize, font });
-              page2.drawText(String(r.screws), { x: 380, y, size: fontSize, font });
-              page2.drawText(String(r.anchors), { x: 460, y, size: fontSize, font });
+              page2.drawText(String(r.width), {
+                x: 160,
+                y,
+                size: fontSize,
+                font,
+              });
+              page2.drawText(String(r.brackets), {
+                x: 300,
+                y,
+                size: fontSize,
+                font,
+              });
+              page2.drawText(String(r.screws), {
+                x: 380,
+                y,
+                size: fontSize,
+                font,
+              });
+              page2.drawText(String(r.anchors), {
+                x: 460,
+                y,
+                size: fontSize,
+                font,
+              });
               y -= 16;
             });
 
@@ -336,9 +376,24 @@ export function MaterialCalculator({
               y = pageH - 40;
             }
             page2.drawText('TOTAL', { x: 20, y, size: fontSize, font });
-            page2.drawText(String(estimate.brackets), { x: 300, y, size: fontSize, font });
-            page2.drawText(String(estimate.screws), { x: 380, y, size: fontSize, font });
-            page2.drawText(String(estimate.anchors), { x: 460, y, size: fontSize, font });
+            page2.drawText(String(estimate.brackets), {
+              x: 300,
+              y,
+              size: fontSize,
+              font,
+            });
+            page2.drawText(String(estimate.screws), {
+              x: 380,
+              y,
+              size: fontSize,
+              font,
+            });
+            page2.drawText(String(estimate.anchors), {
+              x: 460,
+              y,
+              size: fontSize,
+              font,
+            });
 
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
