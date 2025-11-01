@@ -4,7 +4,7 @@ describe('calculateMaterials', () => {
   test('calculates basic counts for floating shelves on drywall', () => {
     const shelves = [
       { id: 's1', width: 36, depth: 8 },
-      { id: 's2', width: 24, depth: 6 }
+      { id: 's2', width: 24, depth: 6 },
     ];
 
     const result = calculateMaterials(shelves, 'drywall', 'floating');
@@ -16,8 +16,10 @@ describe('calculateMaterials', () => {
   });
 
   test('useStuds option removes anchors', () => {
-    const shelves = [ { id: 's1', width: 48, depth: 8 } ];
-    const result = calculateMaterials(shelves, 'drywall', 'bracketed', { useStuds: true } as any);
+    const shelves = [{ id: 's1', width: 48, depth: 8 }];
+    const result = calculateMaterials(shelves, 'drywall', 'bracketed', {
+      useStuds: true,
+    } as any);
     expect(result.anchors).toBe(0);
   });
 });

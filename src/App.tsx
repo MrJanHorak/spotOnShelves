@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, Calculator } from 'lucide-react';
 import { InputSection } from './components/InputSection';
 import { SchematicDisplay } from './components/SchematicDisplay';
@@ -38,6 +38,9 @@ function App() {
     measurements: [],
     instructions: [],
   });
+  const [useStuds, setUseStuds] = useState<boolean>(false);
+  const [selectedShelfId, setSelectedShelfId] = useState<string | null>(null);
+  const [hoveredShelfId, setHoveredShelfId] = useState<string | null>(null);
 
   useEffect(() => {
     const validationErrors = validateInputs(wall, shelves, obstructions);
@@ -134,6 +137,11 @@ function App() {
                 obstructions={obstructions}
                 shelves={result.shelves}
                 unit={settings.unit}
+                wallMaterial={settings.wallMaterial}
+                mountingType={settings.mountingType}
+                useStuds={useStuds}
+                selectedShelfId={hoveredShelfId || selectedShelfId}
+                onHoverShelf={(id) => setHoveredShelfId(id)}
               />
 
               {/* Measurement Output */}
@@ -143,6 +151,13 @@ function App() {
               <MaterialCalculator
                 placedShelves={result.shelves}
                 settings={settings}
+                useStuds={useStuds}
+                onToggleUseStuds={setUseStuds}
+                selectedShelfId={selectedShelfId}
+                onSelectShelf={(id) =>
+                  setSelectedShelfId((prev) => (prev === id ? null : id))
+                }
+                onHoverShelf={(id) => setHoveredShelfId(id)}
               />
             </>
           )}

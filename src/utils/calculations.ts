@@ -296,6 +296,6 @@ export function calculateMaterials(
     anchors: totalAnchors,
     anchorType,
     notes,
-    perShelf
+    perShelf,
   };
 }
