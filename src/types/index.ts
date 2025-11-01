@@ -1,6 +1,12 @@
 export type Unit = 'inches' | 'cm';
 
-export type ObstructionType = 'bed' | 'cabinet' | 'door' | 'window' | 'tv' | 'other';
+export type ObstructionType =
+  | 'bed'
+  | 'cabinet'
+  | 'door'
+  | 'window'
+  | 'tv'
+  | 'other';
 
 export type WallMaterial = 'drywall' | 'plaster' | 'concrete' | 'brick';
 
@@ -57,4 +63,18 @@ export interface MaterialEstimate {
   anchors: number;
   anchorType: string;
   notes?: string;
+}
+
+// Options for material calculation
+export interface MaterialCalcOptions {
+  useStuds?: boolean; // if true, anchors are not required for brackets mounted into studs
+}
+
+// Per-shelf breakdown entry
+export interface PerShelfMaterial {
+  id: string;
+  width: number;
+  brackets: number;
+  screws: number;
+  anchors: number;
 }

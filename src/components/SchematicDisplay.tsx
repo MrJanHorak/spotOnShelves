@@ -1,6 +1,5 @@
-import React from 'react';
 import { WallDimensions, Obstruction, ShelfPlacement, Unit } from '../types';
-import { formatMeasurement } from '../utils/calculations';
+import { formatMeasurement, calculateMaterials } from '../utils/calculations';
 
 interface SchematicDisplayProps {
   wall: WallDimensions;
@@ -150,6 +149,38 @@ export function SchematicDisplay({ wall, obstructions, shelves, unit }: Schemati
                     strokeWidth="1"
                     strokeDasharray="2,2"
                   />
+
+                  {/* Bracket markers */}
+                  {(() => {
+                    // Use the same heuristic as calculateMaterials to derive brackets for this shelf
+                    const perShelf = calculateMaterials([shelf], 'drywall', 'floating', { useStuds: false }).perShelf || [];
+                    const brackets = perShelf[0]?.brackets || 2;
+                    const positions = [] as number[];
+                    for (let i = 0; i < brackets; i++) {
+                      // distribute across shelf width
+                      const px = shelf.distanceFromLeft + (shelf.width * (i + 0.5)) / brackets;
+                      positions.push(px);
+                    }
+
+                    return positions.map((px, bi) => (
+                      <g key={`br-${shelf.id}-${bi}`}>
+                        <line
+                          x1={offsetX + px * scale}
+                          y1={offsetY + (wall.height - shelf.distanceFromFloor - 1) * scale}
+                          x2={offsetX + px * scale}
+                          y2={offsetY + (wall.height - shelf.distanceFromFloor) * scale}
+                          stroke="#111827"
+                          strokeWidth="2"
+                        />
+                        <circle
+                          cx={offsetX + px * scale}
+                          cy={offsetY + (wall.height - shelf.distanceFromFloor - 0.5) * scale}
+                          r={2}
+                          fill="#111827"
+                        />
+                      </g>
+                    ));
+                  })()}
                 </g>
               ))}
 

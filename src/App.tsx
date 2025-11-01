@@ -140,7 +140,10 @@ function App() {
               <MeasurementOutput result={result} unit={settings.unit} />
 
               {/* Material Calculator */}
-              <MaterialCalculator placedShelves={result.shelves} settings={settings} />
+              <MaterialCalculator
+                placedShelves={result.shelves}
+                settings={settings}
+              />
             </>
           )}
 
