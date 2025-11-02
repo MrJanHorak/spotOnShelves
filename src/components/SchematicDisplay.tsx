@@ -6,7 +6,11 @@ import {
   WallMaterial,
   MountingType,
 } from '../types';
-import { formatMeasurement, calculateMaterials } from '../utils/calculations';
+import {
+  formatMeasurement,
+  calculateMaterials,
+  calculateStudLocations,
+} from '../utils/calculations';
 
 interface SchematicDisplayProps {
   wall: WallDimensions;
@@ -18,6 +22,9 @@ interface SchematicDisplayProps {
   useStuds?: boolean;
   selectedShelfId?: string | null;
   onHoverShelf?: (id: string | null) => void;
+  studSpacing?: number;
+  customStudLocations?: number[];
+  enableStudDetection?: boolean;
 }
 
 export function SchematicDisplay({
@@ -30,6 +37,9 @@ export function SchematicDisplay({
   useStuds = false,
   selectedShelfId = null,
   onHoverShelf,
+  studSpacing = 16,
+  customStudLocations,
+  enableStudDetection = false,
 }: SchematicDisplayProps) {
   // local mount state to trigger staggered animations
   let mounted = false;
@@ -71,6 +81,13 @@ export function SchematicDisplay({
     return colors[type as keyof typeof colors] || colors.other;
   };
 
+  // Calculate stud locations
+  const studLocations = enableStudDetection
+    ? customStudLocations && customStudLocations.length > 0
+      ? customStudLocations
+      : calculateStudLocations(wall.width, studSpacing, studSpacing)
+    : [];
+
   return (
     <div className='bg-white rounded-xl shadow-lg p-6'>
       <h2 className='text-2xl font-bold text-gray-900 mb-6'>Wall Schematic</h2>
@@ -105,6 +122,45 @@ export function SchematicDisplay({
                 strokeWidth='2'
                 rx='4'
               />
+
+              {/* Stud Indicators */}
+              {studLocations.map((studPos, index) => {
+                const x = offsetX + studPos * scale;
+                return (
+                  <g key={`stud-${index}`}>
+                    <line
+                      x1={x}
+                      y1={offsetY}
+                      x2={x}
+                      y2={offsetY + scaledHeight}
+                      stroke='#FCD34D'
+                      strokeWidth='2'
+                      strokeDasharray='8,4'
+                      opacity='0.6'
+                    />
+                    <rect
+                      x={x - 8}
+                      y={offsetY - 20}
+                      width='16'
+                      height='16'
+                      fill='#FCD34D'
+                      stroke='#F59E0B'
+                      strokeWidth='1'
+                      rx='2'
+                    />
+                    <text
+                      x={x}
+                      y={offsetY - 12}
+                      textAnchor='middle'
+                      className='text-xs font-bold'
+                      fill='#92400E'
+                      fontSize='10'
+                    >
+                      S
+                    </text>
+                  </g>
+                );
+              })}
 
               {/* Wall Dimensions */}
               <text
@@ -173,139 +229,298 @@ export function SchematicDisplay({
               ))}
 
               {/* Shelves */}
-              {shelves.map((shelf, index) => (
-                <g key={shelf.id}>
-                  <rect
-                    x={offsetX + shelf.distanceFromLeft * scale}
-                    y={
-                      offsetY +
-                      (wall.height - shelf.distanceFromFloor - 1) * scale
-                    } // 1 unit shelf height
-                    width={shelf.width * scale}
-                    height={1 * scale}
-                    fill='#059669'
-                    stroke='#047857'
-                    strokeWidth='2'
-                    rx='1'
-                  />
-                  <text
-                    x={
-                      offsetX +
-                      (shelf.distanceFromLeft + shelf.width / 2) * scale
-                    }
-                    y={
-                      offsetY +
-                      (wall.height - shelf.distanceFromFloor - 0.5) * scale
-                    }
-                    textAnchor='middle'
-                    className='text-xs font-bold'
-                    fill='white'
-                    dominantBaseline='middle'
-                  >
-                    SHELF {index + 1}
-                  </text>
+              {shelves.map((shelf, index) => {
+                // Calculate capacity for this shelf to show on schematic
+                const shelfMaterials = calculateMaterials(
+                  [shelf],
+                  (wallMaterial as WallMaterial) || 'drywall',
+                  (mountingType as MountingType) || 'floating',
+                  { useStuds }
+                );
+                const shelfCapacity =
+                  shelfMaterials.perShelf?.[0]?.maxWeightCapacity;
 
-                  {/* Shelf measurement lines */}
-                  <line
-                    x1={offsetX}
-                    y1={
-                      offsetY + (wall.height - shelf.distanceFromFloor) * scale
-                    }
-                    x2={offsetX + shelf.distanceFromLeft * scale}
-                    y2={
-                      offsetY + (wall.height - shelf.distanceFromFloor) * scale
-                    }
-                    stroke='#6B7280'
-                    strokeWidth='1'
-                    strokeDasharray='2,2'
-                  />
-                  <line
-                    x1={offsetX + shelf.distanceFromLeft * scale}
-                    y1={offsetY + scaledHeight}
-                    x2={offsetX + shelf.distanceFromLeft * scale}
-                    y2={
-                      offsetY + (wall.height - shelf.distanceFromFloor) * scale
-                    }
-                    stroke='#6B7280'
-                    strokeWidth='1'
-                    strokeDasharray='2,2'
-                  />
+                return (
+                  <g key={shelf.id}>
+                    <rect
+                      x={offsetX + shelf.distanceFromLeft * scale}
+                      y={
+                        offsetY +
+                        (wall.height - shelf.distanceFromFloor - 1) * scale
+                      } // 1 unit shelf height
+                      width={shelf.width * scale}
+                      height={1 * scale}
+                      fill='#059669'
+                      stroke='#047857'
+                      strokeWidth='2'
+                      rx='1'
+                    />
+                    <text
+                      x={
+                        offsetX +
+                        (shelf.distanceFromLeft + shelf.width / 2) * scale
+                      }
+                      y={
+                        offsetY +
+                        (wall.height - shelf.distanceFromFloor - 0.5) * scale
+                      }
+                      textAnchor='middle'
+                      className='text-xs font-bold'
+                      fill='white'
+                      dominantBaseline='middle'
+                    >
+                      SHELF {index + 1}
+                    </text>
 
-                  {/* Bracket markers */}
-                  {(() => {
-                    // Derive brackets for this shelf using current settings
-                    const perShelf =
-                      calculateMaterials(
-                        [shelf],
-                        (wallMaterial as WallMaterial) || 'drywall',
-                        (mountingType as MountingType) || 'floating',
-                        { useStuds }
-                      ).perShelf || [];
-                    const bracketsForThisShelf = perShelf[0]?.brackets || 2;
-
-                    const positions: number[] = [];
-                    for (let i = 0; i < bracketsForThisShelf; i++) {
-                      // distribute across shelf width (centered positions)
-                      const px =
-                        shelf.distanceFromLeft +
-                        (shelf.width * (i + 0.5)) / bracketsForThisShelf;
-                      positions.push(px);
-                    }
-
-                    return positions.map((px, bi) => {
-                      const isSelected = selectedShelfId === shelf.id;
-                      return (
-                        <g
-                          key={`br-${shelf.id}-${bi}`}
-                          className={`bracket-marker group br-${shelf.id}`}
-                          data-shelf-id={shelf.id}
-                          onMouseEnter={() =>
-                            onHoverShelf && onHoverShelf(shelf.id)
+                    {/* Weight capacity badge */}
+                    {shelfCapacity && (
+                      <g>
+                        <rect
+                          x={
+                            offsetX +
+                            (shelf.distanceFromLeft + shelf.width - 3) * scale
                           }
-                          onMouseLeave={() =>
-                            onHoverShelf && onHoverShelf(null)
+                          y={
+                            offsetY +
+                            (wall.height - shelf.distanceFromFloor - 2.5) *
+                              scale
                           }
+                          width='52'
+                          height='18'
+                          fill='#1E40AF'
+                          stroke='#1E3A8A'
+                          strokeWidth='1'
+                          rx='4'
+                          opacity='0.95'
+                        />
+                        <text
+                          x={
+                            offsetX +
+                            (shelf.distanceFromLeft + shelf.width - 3) * scale +
+                            26
+                          }
+                          y={
+                            offsetY +
+                            (wall.height - shelf.distanceFromFloor - 2.5) *
+                              scale +
+                            9
+                          }
+                          textAnchor='middle'
+                          dominantBaseline='middle'
+                          className='text-xs font-bold'
+                          fill='white'
+                          fontSize='9'
                         >
-                          <line
-                            x1={offsetX + px * scale}
-                            y1={
-                              offsetY +
-                              (wall.height - shelf.distanceFromFloor - 1) *
-                                scale
-                            }
-                            x2={offsetX + px * scale}
-                            y2={
-                              offsetY +
-                              (wall.height - shelf.distanceFromFloor) * scale
-                            }
-                            stroke={isSelected ? '#b45309' : '#111827'}
-                            strokeWidth={isSelected ? 3 : 2}
-                            style={{
-                              transition:
-                                'stroke 220ms ease, stroke-width 220ms ease',
-                              transformOrigin: 'center',
-                            }}
-                          />
-                          <circle
-                            cx={offsetX + px * scale}
-                            cy={
-                              offsetY +
-                              (wall.height - shelf.distanceFromFloor - 0.5) *
-                                scale
-                            }
-                            r={isSelected ? 4 : 2}
-                            fill={isSelected ? '#b45309' : '#111827'}
-                            style={{
-                              transition: 'r 220ms ease, fill 220ms ease',
-                              transformOrigin: 'center',
-                            }}
-                          />
-                        </g>
+                          {shelfCapacity}lb
+                        </text>
+                      </g>
+                    )}
+
+                    {/* Shelf measurement lines */}
+                    <line
+                      x1={offsetX}
+                      y1={
+                        offsetY +
+                        (wall.height - shelf.distanceFromFloor) * scale
+                      }
+                      x2={offsetX + shelf.distanceFromLeft * scale}
+                      y2={
+                        offsetY +
+                        (wall.height - shelf.distanceFromFloor) * scale
+                      }
+                      stroke='#6B7280'
+                      strokeWidth='1'
+                      strokeDasharray='2,2'
+                    />
+                    <line
+                      x1={offsetX + shelf.distanceFromLeft * scale}
+                      y1={offsetY + scaledHeight}
+                      x2={offsetX + shelf.distanceFromLeft * scale}
+                      y2={
+                        offsetY +
+                        (wall.height - shelf.distanceFromFloor) * scale
+                      }
+                      stroke='#6B7280'
+                      strokeWidth='1'
+                      strokeDasharray='2,2'
+                    />
+
+                    {/* Bracket markers */}
+                    {(() => {
+                      // Derive brackets for this shelf using current settings
+                      const perShelf =
+                        calculateMaterials(
+                          [shelf],
+                          (wallMaterial as WallMaterial) || 'drywall',
+                          (mountingType as MountingType) || 'floating',
+                          { useStuds }
+                        ).perShelf || [];
+                      const bracketsForThisShelf = perShelf[0]?.brackets || 2;
+                      const bracketPositions =
+                        perShelf[0]?.bracketPositions || [];
+
+                      const positions: number[] = [];
+                      for (let i = 0; i < bracketsForThisShelf; i++) {
+                        // distribute across shelf width (centered positions)
+                        const px =
+                          shelf.distanceFromLeft +
+                          (shelf.width * (i + 0.5)) / bracketsForThisShelf;
+                        positions.push(px);
+                      }
+
+                      return (
+                        <>
+                          {positions.map((px, bi) => {
+                            const isSelected = selectedShelfId === shelf.id;
+                            const distanceFromEdge =
+                              bracketPositions[bi] ||
+                              (shelf.width * (bi + 0.5)) / bracketsForThisShelf;
+
+                            return (
+                              <g
+                                key={`br-${shelf.id}-${bi}`}
+                                className={`bracket-marker group br-${shelf.id}`}
+                                data-shelf-id={shelf.id}
+                                onMouseEnter={() =>
+                                  onHoverShelf && onHoverShelf(shelf.id)
+                                }
+                                onMouseLeave={() =>
+                                  onHoverShelf && onHoverShelf(null)
+                                }
+                              >
+                                <line
+                                  x1={offsetX + px * scale}
+                                  y1={
+                                    offsetY +
+                                    (wall.height -
+                                      shelf.distanceFromFloor -
+                                      1) *
+                                      scale
+                                  }
+                                  x2={offsetX + px * scale}
+                                  y2={
+                                    offsetY +
+                                    (wall.height - shelf.distanceFromFloor) *
+                                      scale
+                                  }
+                                  stroke={isSelected ? '#b45309' : '#111827'}
+                                  strokeWidth={isSelected ? 3 : 2}
+                                  style={{
+                                    transition:
+                                      'stroke 220ms ease, stroke-width 220ms ease',
+                                    transformOrigin: 'center',
+                                  }}
+                                />
+                                <circle
+                                  cx={offsetX + px * scale}
+                                  cy={
+                                    offsetY +
+                                    (wall.height -
+                                      shelf.distanceFromFloor -
+                                      0.5) *
+                                      scale
+                                  }
+                                  r={isSelected ? 4 : 2}
+                                  fill={isSelected ? '#b45309' : '#111827'}
+                                  style={{
+                                    transition: 'r 220ms ease, fill 220ms ease',
+                                    transformOrigin: 'center',
+                                  }}
+                                />
+                                {/* Distance from left edge label */}
+                                <g>
+                                  <rect
+                                    x={offsetX + px * scale - 22}
+                                    y={
+                                      offsetY +
+                                      (wall.height -
+                                        shelf.distanceFromFloor -
+                                        0.5) *
+                                        scale +
+                                      8
+                                    }
+                                    width='44'
+                                    height='14'
+                                    fill='#F59E0B'
+                                    stroke='#D97706'
+                                    strokeWidth='1'
+                                    rx='3'
+                                    opacity='0.95'
+                                  />
+                                  <text
+                                    x={offsetX + px * scale}
+                                    y={
+                                      offsetY +
+                                      (wall.height -
+                                        shelf.distanceFromFloor -
+                                        0.5) *
+                                        scale +
+                                      15
+                                    }
+                                    textAnchor='middle'
+                                    dominantBaseline='middle'
+                                    className='text-xs font-bold'
+                                    fill='white'
+                                    fontSize='8'
+                                  >
+                                    {distanceFromEdge.toFixed(1)}"
+                                  </text>
+                                </g>
+                              </g>
+                            );
+                          })}
+                          {/* Bracket spacing indicators */}
+                          {positions.length > 1 &&
+                            positions.map((px, bi) => {
+                              if (bi === positions.length - 1) return null;
+                              const nextPx = positions[bi + 1];
+                              const spacing = nextPx - px;
+                              const midX = (px + nextPx) / 2;
+                              const y = shelf.distanceFromFloor + 2.5;
+
+                              return (
+                                <g key={`spacing-${shelf.id}-${bi}`}>
+                                  {/* Spacing line */}
+                                  <line
+                                    x1={offsetX + px * scale}
+                                    y1={offsetY + (wall.height - y) * scale}
+                                    x2={offsetX + nextPx * scale}
+                                    y2={offsetY + (wall.height - y) * scale}
+                                    stroke='#6366F1'
+                                    strokeWidth='1.5'
+                                    strokeDasharray='3,2'
+                                    opacity='0.7'
+                                  />
+                                  {/* Spacing measurement */}
+                                  <rect
+                                    x={offsetX + midX * scale - 20}
+                                    y={offsetY + (wall.height - y) * scale - 10}
+                                    width='40'
+                                    height='16'
+                                    fill='#6366F1'
+                                    rx='3'
+                                    opacity='0.9'
+                                  />
+                                  <text
+                                    x={offsetX + midX * scale}
+                                    y={offsetY + (wall.height - y) * scale}
+                                    textAnchor='middle'
+                                    dominantBaseline='middle'
+                                    className='text-xs font-semibold'
+                                    fill='white'
+                                    fontSize='9'
+                                  >
+                                    {spacing.toFixed(1)}"
+                                  </text>
+                                </g>
+                              );
+                            })}
+                        </>
                       );
-                    });
-                  })()}
-                </g>
-              ))}
+                    })()}
+                  </g>
+                );
+              })}
 
               {/* Grid lines for reference */}
               <defs>
@@ -347,6 +562,16 @@ export function SchematicDisplay({
               <div className='flex items-center gap-2'>
                 <div className='w-4 h-4 bg-green-600 rounded'></div>
                 <span>Shelves</span>
+              </div>
+              {enableStudDetection && studLocations.length > 0 && (
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-yellow-300 border border-yellow-600 rounded'></div>
+                  <span>Studs ({studLocations.length})</span>
+                </div>
+              )}
+              <div className='flex items-center gap-2'>
+                <div className='w-4 h-4 bg-indigo-500 rounded'></div>
+                <span>Bracket Spacing</span>
               </div>
             </div>
           </div>

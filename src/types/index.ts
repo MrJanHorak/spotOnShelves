@@ -23,6 +23,7 @@ export interface ShelfDimensions {
   width: number;
   depth: number;
   id: string;
+  expectedWeight?: number; // in pounds
 }
 
 export interface Obstruction {
@@ -40,6 +41,7 @@ export interface ShelfPlacement {
   distanceFromFloor: number;
   width: number;
   depth: number;
+  expectedWeight?: number;
 }
 
 export interface CalculationResult {
@@ -54,6 +56,9 @@ export interface ProjectSettings {
   wallMaterial: WallMaterial;
   mountingType: MountingType;
   alignment: Alignment;
+  studSpacing?: number; // 16 or 24 inches on center
+  customStudLocations?: number[]; // custom stud positions from left edge
+  enableStudDetection?: boolean;
 }
 
 // Material estimate returned by the material calculator
@@ -63,11 +68,16 @@ export interface MaterialEstimate {
   anchors: number;
   anchorType: string;
   notes?: string;
+  maxWeightCapacity?: number; // in pounds
+  safetyFactor?: number;
+  perShelf?: PerShelfMaterial[]; // per-shelf breakdown
 }
 
 // Options for material calculation
 export interface MaterialCalcOptions {
   useStuds?: boolean; // if true, anchors are not required for brackets mounted into studs
+  studSpacing?: number; // standard stud spacing (16 or 24 inches)
+  studLocations?: number[]; // specific stud locations from left edge
 }
 
 // Per-shelf breakdown entry
@@ -77,4 +87,7 @@ export interface PerShelfMaterial {
   brackets: number;
   screws: number;
   anchors: number;
+  maxWeightCapacity?: number; // in pounds
+  bracketSpacing?: number; // in inches
+  bracketPositions?: number[]; // distance from left edge of shelf to each bracket center
 }
