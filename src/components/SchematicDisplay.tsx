@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   WallDimensions,
   Obstruction,
@@ -41,6 +42,11 @@ export function SchematicDisplay({
   customStudLocations,
   enableStudDetection = false,
 }: SchematicDisplayProps) {
+  // Display options state
+  const [showStuds, setShowStuds] = useState(true);
+  const [showBracketDetails, setShowBracketDetails] = useState(false);
+  const [showSpacing, setShowSpacing] = useState(true);
+
   // local mount state to trigger staggered animations
   let mounted = false;
   // small helper to add a 'mounted' class after a tick
@@ -124,43 +130,43 @@ export function SchematicDisplay({
               />
 
               {/* Stud Indicators */}
-              {studLocations.map((studPos, index) => {
-                const x = offsetX + studPos * scale;
-                return (
-                  <g key={`stud-${index}`}>
-                    <line
-                      x1={x}
-                      y1={offsetY}
-                      x2={x}
-                      y2={offsetY + scaledHeight}
-                      stroke='#FCD34D'
-                      strokeWidth='2'
-                      strokeDasharray='8,4'
-                      opacity='0.6'
-                    />
-                    <rect
-                      x={x - 8}
-                      y={offsetY - 20}
-                      width='16'
-                      height='16'
-                      fill='#FCD34D'
-                      stroke='#F59E0B'
-                      strokeWidth='1'
-                      rx='2'
-                    />
-                    <text
-                      x={x}
-                      y={offsetY - 12}
-                      textAnchor='middle'
-                      className='text-xs font-bold'
-                      fill='#92400E'
-                      fontSize='10'
-                    >
-                      S
-                    </text>
-                  </g>
-                );
-              })}
+              {showStuds &&
+                studLocations.map((studPos, index) => {
+                  const x = offsetX + studPos * scale;
+                  return (
+                    <g key={`stud-${index}`}>
+                      <line
+                        x1={x}
+                        y1={offsetY}
+                        x2={x}
+                        y2={offsetY + scaledHeight}
+                        stroke='#D1D5DB'
+                        strokeWidth='1.5'
+                        strokeDasharray='6,4'
+                        opacity='0.5'
+                      />
+                      <circle
+                        cx={x}
+                        cy={offsetY - 12}
+                        r='6'
+                        fill='#F3F4F6'
+                        stroke='#9CA3AF'
+                        strokeWidth='1'
+                      />
+                      <text
+                        x={x}
+                        y={offsetY - 12}
+                        textAnchor='middle'
+                        dominantBaseline='middle'
+                        className='text-xs font-medium'
+                        fill='#6B7280'
+                        fontSize='8'
+                      >
+                        S
+                      </text>
+                    </g>
+                  );
+                })}
 
               {/* Wall Dimensions */}
               <text
@@ -428,49 +434,52 @@ export function SchematicDisplay({
                                   }}
                                 />
                                 {/* Distance from left edge label */}
-                                <g>
-                                  <rect
-                                    x={offsetX + px * scale - 22}
-                                    y={
-                                      offsetY +
-                                      (wall.height -
-                                        shelf.distanceFromFloor -
-                                        0.5) *
-                                        scale +
-                                      8
-                                    }
-                                    width='44'
-                                    height='14'
-                                    fill='#F59E0B'
-                                    stroke='#D97706'
-                                    strokeWidth='1'
-                                    rx='3'
-                                    opacity='0.95'
-                                  />
-                                  <text
-                                    x={offsetX + px * scale}
-                                    y={
-                                      offsetY +
-                                      (wall.height -
-                                        shelf.distanceFromFloor -
-                                        0.5) *
-                                        scale +
-                                      15
-                                    }
-                                    textAnchor='middle'
-                                    dominantBaseline='middle'
-                                    className='text-xs font-bold'
-                                    fill='white'
-                                    fontSize='8'
-                                  >
-                                    {distanceFromEdge.toFixed(1)}"
-                                  </text>
-                                </g>
+                                {showBracketDetails && (
+                                  <g>
+                                    <rect
+                                      x={offsetX + px * scale - 22}
+                                      y={
+                                        offsetY +
+                                        (wall.height -
+                                          shelf.distanceFromFloor -
+                                          0.5) *
+                                          scale +
+                                        8
+                                      }
+                                      width='44'
+                                      height='14'
+                                      fill='#F59E0B'
+                                      stroke='#D97706'
+                                      strokeWidth='1'
+                                      rx='3'
+                                      opacity='0.95'
+                                    />
+                                    <text
+                                      x={offsetX + px * scale}
+                                      y={
+                                        offsetY +
+                                        (wall.height -
+                                          shelf.distanceFromFloor -
+                                          0.5) *
+                                          scale +
+                                        15
+                                      }
+                                      textAnchor='middle'
+                                      dominantBaseline='middle'
+                                      className='text-xs font-bold'
+                                      fill='white'
+                                      fontSize='8'
+                                    >
+                                      {distanceFromEdge.toFixed(1)}"
+                                    </text>
+                                  </g>
+                                )}
                               </g>
                             );
                           })}
                           {/* Bracket spacing indicators */}
-                          {positions.length > 1 &&
+                          {showSpacing &&
+                            positions.length > 1 &&
                             positions.map((px, bi) => {
                               if (bi === positions.length - 1) return null;
                               const nextPx = positions[bi + 1];
@@ -573,6 +582,42 @@ export function SchematicDisplay({
                 <div className='w-4 h-4 bg-indigo-500 rounded'></div>
                 <span>Bracket Spacing</span>
               </div>
+            </div>
+          </div>
+
+          {/* Display Options */}
+          <div>
+            <h4 className='font-medium text-gray-900 mb-3'>Display Options</h4>
+            <div className='space-y-2'>
+              {enableStudDetection && studLocations.length > 0 && (
+                <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                  <input
+                    type='checkbox'
+                    checked={showStuds}
+                    onChange={(e) => setShowStuds(e.target.checked)}
+                    className='rounded border-gray-300 text-green-600 focus:ring-green-500'
+                  />
+                  <span>Show stud locations</span>
+                </label>
+              )}
+              <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                <input
+                  type='checkbox'
+                  checked={showBracketDetails}
+                  onChange={(e) => setShowBracketDetails(e.target.checked)}
+                  className='rounded border-gray-300 text-green-600 focus:ring-green-500'
+                />
+                <span>Show bracket measurements</span>
+              </label>
+              <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                <input
+                  type='checkbox'
+                  checked={showSpacing}
+                  onChange={(e) => setShowSpacing(e.target.checked)}
+                  className='rounded border-gray-300 text-green-600 focus:ring-green-500'
+                />
+                <span>Show bracket spacing</span>
+              </label>
             </div>
           </div>
 

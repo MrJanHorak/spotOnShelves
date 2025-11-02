@@ -1153,11 +1153,26 @@ export async function generateComprehensivePDF(
   });
   y -= 35;
 
+  // Helper function to remove emojis and unsupported Unicode characters
+  const stripEmojis = (text: string): string => {
+    // Remove emojis and other characters that can't be encoded in WinAnsi
+    // This regex matches most emoji patterns
+    return text
+      .replace(
+        /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[\u{1F100}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F910}-\u{1F96B}]|[\u{1F980}-\u{1F9E0}]/gu,
+        ''
+      )
+      .trim();
+  };
+
   // Step-by-step instructions
   result.instructions.forEach((instruction, index) => {
     if (y < margin + 40) {
       return;
     }
+
+    // Remove emojis from instruction text
+    const cleanInstruction = stripEmojis(instruction);
 
     // Draw step number circle
     page4.drawCircle({
@@ -1176,7 +1191,7 @@ export async function generateComprehensivePDF(
 
     // Wrap long instructions
     const maxWidth = pageWidth - 2 * margin - 30;
-    const words = instruction.split(' ');
+    const words = cleanInstruction.split(' ');
     let line = '';
     let lineY = y - 10;
 
