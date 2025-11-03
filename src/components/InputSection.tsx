@@ -9,15 +9,20 @@ import {
   WallMaterial,
   MountingType,
   Alignment,
+  WallItem,
+  ItemType,
+  HangingMethod,
+  GalleryLayout,
 } from '../types';
+import { ItemTypeSelector } from './ItemTypeSelector';
 
 interface InputSectionProps {
   wall: WallDimensions;
-  shelves: ShelfDimensions[];
+  shelves: (ShelfDimensions | WallItem)[];
   obstructions: Obstruction[];
   settings: ProjectSettings;
   onWallChange: (wall: WallDimensions) => void;
-  onShelvesChange: (shelves: ShelfDimensions[]) => void;
+  onShelvesChange: (shelves: (ShelfDimensions | WallItem)[]) => void;
   onObstructionsChange: (obstructions: Obstruction[]) => void;
   onSettingsChange: (settings: ProjectSettings) => void;
 }
@@ -44,7 +49,9 @@ export function InputSection({
   const addShelf = () => {
     const newShelf: ShelfDimensions = {
       id: `shelf-${Date.now()}`,
+      type: 'shelf',
       width: 24,
+      height: 1,
       depth: 8,
     };
     onShelvesChange([...shelves, newShelf]);
@@ -54,11 +61,22 @@ export function InputSection({
     onShelvesChange(shelves.filter((shelf) => shelf.id !== id));
   };
 
-  const updateShelf = (id: string, updates: Partial<ShelfDimensions>) => {
+  const updateShelf = (
+    id: string,
+    updates: Partial<ShelfDimensions | WallItem>
+  ) => {
     onShelvesChange(
-      shelves.map((shelf) =>
-        shelf.id === id ? { ...shelf, ...updates } : shelf
-      )
+      shelves.map((shelf) => {
+        if (shelf.id === id) {
+          // Type-safe update based on item type
+          if (shelf.type === 'shelf') {
+            return { ...shelf, ...updates } as ShelfDimensions;
+          } else {
+            return { ...shelf, ...updates } as WallItem;
+          }
+        }
+        return shelf;
+      })
     );
   };
 
@@ -295,33 +313,63 @@ export function InputSection({
         </div>
       </div>
 
-      {/* Shelves */}
+      {/* Items Section (Shelves and Wall Items) */}
       <div>
         <div className='flex items-center justify-between mb-4'>
-          <h3 className='text-xl font-semibold text-gray-900'>Shelves</h3>
+          <h3 className='text-xl font-semibold text-gray-900'>Items to Hang</h3>
           <button
             onClick={addShelf}
             className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
           >
             <Plus className='h-4 w-4' />
-            Add Shelf
+            Add Item
           </button>
         </div>
         <div className='space-y-4'>
-          {shelves.map((shelf, index) => (
+          {shelves.map((item, index) => (
             <div
-              key={shelf.id}
+              key={item.id}
               className='border border-gray-200 rounded-lg p-4'
             >
               <div className='flex items-center justify-between mb-3'>
-                <h4 className='font-medium text-gray-900'>Shelf {index + 1}</h4>
+                <h4 className='font-medium text-gray-900'>
+                  {item.type.charAt(0).toUpperCase() + item.type.slice(1)}{' '}
+                  {index + 1}
+                </h4>
                 <button
-                  onClick={() => removeShelf(shelf.id)}
+                  onClick={() => removeShelf(item.id)}
                   className='text-red-600 hover:text-red-800 transition-colors'
                 >
                   <X className='h-4 w-4' />
                 </button>
               </div>
+
+              {/* Item Type Selector */}
+              <div className='mb-4'>
+                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                  Item Type
+                </label>
+                <ItemTypeSelector
+                  selectedType={item.type}
+                  onTypeChange={(newType: ItemType) => {
+                    // Create a new item of the selected type
+                    if (newType === 'shelf') {
+                      updateShelf(item.id, {
+                        type: 'shelf',
+                        depth: 8,
+                        height: 1,
+                      });
+                    } else {
+                      updateShelf(item.id, {
+                        type: newType,
+                        height: 24,
+                        hangingMethod: 'wire',
+                      });
+                    }
+                  }}
+                />
+              </div>
+
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
                   <label className='block text-sm font-medium text-gray-700 mb-1'>
@@ -329,9 +377,9 @@ export function InputSection({
                   </label>
                   <input
                     type='number'
-                    value={shelf.width}
+                    value={item.width}
                     onChange={(e) =>
-                      updateShelf(shelf.id, {
+                      updateShelf(item.id, {
                         width: parseFloat(e.target.value) || 0,
                       })
                     }
@@ -340,50 +388,188 @@ export function InputSection({
                     step='0.1'
                   />
                 </div>
+
+                {item.type === 'shelf' ? (
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Depth ({settings.unit === 'inches' ? 'in' : 'cm'})
+                    </label>
+                    <input
+                      type='number'
+                      value={(item as ShelfDimensions).depth}
+                      onChange={(e) =>
+                        updateShelf(item.id, {
+                          depth: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      min='0'
+                      step='0.1'
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Height ({settings.unit === 'inches' ? 'in' : 'cm'})
+                    </label>
+                    <input
+                      type='number'
+                      value={item.height}
+                      onChange={(e) =>
+                        updateShelf(item.id, {
+                          height: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      min='0'
+                      step='0.1'
+                    />
+                  </div>
+                )}
+
                 <div>
                   <label className='block text-sm font-medium text-gray-700 mb-1'>
-                    Depth ({settings.unit === 'inches' ? 'in' : 'cm'})
+                    {item.type === 'shelf'
+                      ? 'Expected Weight (lbs)'
+                      : 'Weight (lbs)'}
                   </label>
                   <input
                     type='number'
-                    value={shelf.depth}
+                    value={
+                      item.type === 'shelf'
+                        ? (item as ShelfDimensions).expectedWeight || ''
+                        : (item as WallItem).weight || ''
+                    }
                     onChange={(e) =>
-                      updateShelf(shelf.id, {
-                        depth: parseFloat(e.target.value) || 0,
-                      })
+                      updateShelf(
+                        item.id,
+                        item.type === 'shelf'
+                          ? {
+                              expectedWeight:
+                                parseFloat(e.target.value) || undefined,
+                            }
+                          : { weight: parseFloat(e.target.value) || undefined }
+                      )
                     }
                     className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                    min='0'
-                    step='0.1'
-                  />
-                </div>
-                <div className='md:col-span-2'>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>
-                    Expected Weight (lbs) - Optional
-                  </label>
-                  <input
-                    type='number'
-                    value={shelf.expectedWeight || ''}
-                    onChange={(e) =>
-                      updateShelf(shelf.id, {
-                        expectedWeight: parseFloat(e.target.value) || undefined,
-                      })
+                    placeholder={
+                      item.type === 'shelf'
+                        ? 'Expected weight'
+                        : 'Actual weight'
                     }
-                    className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                    placeholder='Enter expected weight for load calculations'
                     min='0'
                     step='1'
                   />
                 </div>
+
+                {item.type !== 'shelf' && (
+                  <>
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Hanging Method
+                      </label>
+                      <select
+                        value={(item as WallItem).hangingMethod || 'wire'}
+                        onChange={(e) =>
+                          updateShelf(item.id, {
+                            hangingMethod: e.target.value as HangingMethod,
+                          })
+                        }
+                        className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      >
+                        <option value='wire'>Wire</option>
+                        <option value='sawtooth'>Sawtooth Hanger</option>
+                        <option value='keyhole'>Keyhole</option>
+                        <option value='french-cleat'>French Cleat</option>
+                        <option value='d-ring'>D-Ring</option>
+                        <option value='bracket'>Bracket</option>
+                      </select>
+                    </div>
+
+                    {item.type === 'picture' && (
+                      <div className='flex items-center gap-2'>
+                        <input
+                          type='checkbox'
+                          id={`framed-${item.id}`}
+                          checked={(item as WallItem).isFramed || false}
+                          onChange={(e) =>
+                            updateShelf(item.id, {
+                              isFramed: e.target.checked,
+                            })
+                          }
+                          className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                        />
+                        <label
+                          htmlFor={`framed-${item.id}`}
+                          className='text-sm font-medium text-gray-700'
+                        >
+                          Framed
+                        </label>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}
           {shelves.length === 0 && (
             <div className='text-center py-8 text-gray-500'>
-              No shelves added yet. Click "Add Shelf" to get started.
+              No items added yet. Click "Add Item" to get started.
             </div>
           )}
         </div>
+
+        {/* Gallery Layout Settings */}
+        {shelves.some((item) => item.type !== 'shelf') && (
+          <div className='mt-6 p-4 bg-purple-50 rounded-lg'>
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
+              Gallery Layout Pattern
+            </label>
+            <select
+              value={settings.galleryLayout || 'custom'}
+              onChange={(e) =>
+                onSettingsChange({
+                  ...settings,
+                  galleryLayout: e.target.value as GalleryLayout,
+                })
+              }
+              className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+            >
+              <option value='custom'>Custom (User Positioned)</option>
+              <option value='grid'>Grid Layout</option>
+              <option value='salon'>Salon Style</option>
+              <option value='linear'>Linear (Single Row)</option>
+            </select>
+            <p className='text-xs text-gray-600 mt-2'>
+              Choose a layout pattern for pictures, posters, and art pieces
+            </p>
+
+            <div className='mt-3'>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Eye Level Height ({settings.unit === 'inches' ? 'in' : 'cm'}) -
+                Center of artwork
+              </label>
+              <input
+                type='number'
+                value={settings.eyeLevelHeight || 57}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    eyeLevelHeight: parseFloat(e.target.value) || 57,
+                  })
+                }
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                placeholder='Standard is 57"'
+                min='40'
+                max='72'
+                step='1'
+              />
+              <p className='text-xs text-gray-600 mt-1'>
+                Standard gallery height is 57-60 inches from floor to center
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Obstructions */}

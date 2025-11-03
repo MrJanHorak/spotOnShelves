@@ -10,6 +10,11 @@ import {
   WallMaterial,
   MaterialCalcOptions,
   PerShelfMaterial,
+  BaseItem,
+  WallItem,
+  ItemType,
+  HardwareRecommendation,
+  GalleryLayout,
 } from '../types';
 
 export function validateInputs(
@@ -194,12 +199,14 @@ export function calculateOptimalPlacement(
 
     placements.push({
       id: shelf.id,
+      type: 'shelf',
       distanceFromLeft: Math.max(
         wallMargin,
         Math.min(adjustedX, wall.width - shelf.width - wallMargin)
       ),
       distanceFromFloor: currentY,
       width: shelf.width,
+      height: shelfHeight,
       depth: shelf.depth,
       expectedWeight: shelf.expectedWeight,
     });
@@ -509,4 +516,529 @@ export function calculateMaterials(
     maxWeightCapacity: totalCapacity,
     safetyFactor: 0.75,
   };
+}
+
+// Calculate eye-level height for pictures (57-60 inches is standard gallery height)
+export function calculateEyeLevelHeight(
+  wallHeight: number,
+  itemHeight: number
+): number {
+  // Standard gallery height is 57 inches to center of artwork
+  const standardEyeLevel = 57;
+
+  // If wall is very tall, use standard height; otherwise adjust proportionally
+  const eyeLevel = wallHeight > 96 ? standardEyeLevel : wallHeight * 0.55;
+
+  // Return the floor distance to the BOTTOM of the item (center - half height)
+  return eyeLevel - itemHeight / 2;
+}
+
+// Calculate optimal placement for wall items (pictures, posters, etc.)
+export function calculateWallItemPlacement(
+  wall: WallDimensions,
+  items: (ShelfDimensions | WallItem)[],
+  obstructions: Obstruction[],
+  alignment: Alignment = 'center',
+  galleryLayout: GalleryLayout = 'custom',
+  eyeLevelHeight: number = 57
+): CalculationResult {
+  if (items.length === 0) {
+    return {
+      shelves: [],
+      measurements: [],
+      instructions: [],
+      hardwareRecommendations: [],
+    };
+  }
+
+  const placements: ShelfPlacement[] = [];
+  const hardwareRecommendations: HardwareRecommendation[] = [];
+
+  // Separate shelves from wall items
+  const shelves = items.filter(
+    (item): item is ShelfDimensions => item.type === 'shelf'
+  );
+  const wallItems = items.filter(
+    (item): item is WallItem => item.type !== 'shelf'
+  );
+
+  // First, place shelves using existing logic
+  if (shelves.length > 0) {
+    const shelfResult = calculateOptimalPlacement(
+      wall,
+      shelves,
+      obstructions,
+      alignment
+    );
+    placements.push(...shelfResult.shelves);
+  }
+
+  // Then place wall items based on gallery layout
+  if (wallItems.length > 0) {
+    const wallItemPlacements = applyGalleryLayout(
+      wall,
+      wallItems,
+      obstructions,
+      alignment,
+      galleryLayout,
+      eyeLevelHeight,
+      placements // existing placements to avoid
+    );
+    placements.push(...wallItemPlacements);
+
+    // Generate hardware recommendations for each wall item
+    wallItems.forEach((item) => {
+      const recommendation = generateHardwareRecommendation(item, 'drywall');
+      hardwareRecommendations.push(recommendation);
+    });
+  }
+
+  const measurements = placements.map((placement, index) => {
+    const item = items.find((i) => i.id === placement.id);
+    const typeLabel = item ? getItemTypeLabel(item.type) : 'Item';
+    const weightInfo = placement.weight
+      ? ` (Weight: ${placement.weight} lbs)`
+      : '';
+    return `${typeLabel} ${index + 1}: ${placement.distanceFromLeft.toFixed(
+      1
+    )}" from left, ${placement.distanceFromFloor.toFixed(
+      1
+    )}" from floor${weightInfo}`;
+  });
+
+  const instructions = generateInstallationInstructions(items, galleryLayout);
+
+  return {
+    shelves: placements,
+    measurements,
+    instructions,
+    hardwareRecommendations,
+    galleryLayout,
+  };
+}
+
+// Apply different gallery layout patterns
+function applyGalleryLayout(
+  wall: WallDimensions,
+  items: WallItem[],
+  obstructions: Obstruction[],
+  alignment: Alignment,
+  layout: GalleryLayout,
+  eyeLevelHeight: number,
+  existingPlacements: ShelfPlacement[]
+): ShelfPlacement[] {
+  const placements: ShelfPlacement[] = [];
+  const wallMargin = 4;
+
+  switch (layout) {
+    case 'grid':
+      return applyGridLayout(wall, items, wallMargin, eyeLevelHeight);
+    case 'salon':
+      return applySalonLayout(wall, items, wallMargin, eyeLevelHeight);
+    case 'linear':
+      return applyLinearLayout(
+        wall,
+        items,
+        alignment,
+        wallMargin,
+        eyeLevelHeight
+      );
+    case 'custom':
+    default:
+      return applyCustomLayout(
+        wall,
+        items,
+        alignment,
+        wallMargin,
+        eyeLevelHeight
+      );
+  }
+}
+
+// Grid layout: evenly spaced in rows and columns
+function applyGridLayout(
+  wall: WallDimensions,
+  items: WallItem[],
+  margin: number,
+  eyeLevelHeight: number
+): ShelfPlacement[] {
+  const placements: ShelfPlacement[] = [];
+  const spacing = 6; // spacing between items
+
+  // Calculate grid dimensions
+  const cols = Math.ceil(Math.sqrt(items.length));
+  const rows = Math.ceil(items.length / cols);
+
+  // Calculate available space
+  const availableWidth = wall.width - 2 * margin;
+  const availableHeight = wall.height - 2 * margin;
+
+  items.forEach((item, index) => {
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+
+    const x = margin + (col * availableWidth) / cols + spacing;
+    const y = margin + (row * availableHeight) / rows + spacing;
+
+    placements.push({
+      id: item.id,
+      type: item.type,
+      distanceFromLeft: x,
+      distanceFromFloor: y,
+      width: item.width,
+      height: item.height,
+      weight: item.weight,
+      hangingMethod: item.hangingMethod,
+      frameDepth: item.frameDepth,
+      isFramed: item.isFramed,
+    });
+  });
+
+  return placements;
+}
+
+// Salon layout: organic, clustered arrangement
+function applySalonLayout(
+  wall: WallDimensions,
+  items: WallItem[],
+  margin: number,
+  eyeLevelHeight: number
+): ShelfPlacement[] {
+  const placements: ShelfPlacement[] = [];
+
+  // Sort by size (largest first)
+  const sorted = [...items].sort(
+    (a, b) => b.width * b.height - a.width * a.height
+  );
+
+  // Place largest item at eye level center
+  if (sorted.length > 0) {
+    const centerItem = sorted[0];
+    placements.push({
+      id: centerItem.id,
+      type: centerItem.type,
+      distanceFromLeft: (wall.width - centerItem.width) / 2,
+      distanceFromFloor: eyeLevelHeight - centerItem.height / 2,
+      width: centerItem.width,
+      height: centerItem.height,
+      weight: centerItem.weight,
+      hangingMethod: centerItem.hangingMethod,
+      frameDepth: centerItem.frameDepth,
+      isFramed: centerItem.isFramed,
+    });
+
+    // Place remaining items around the center
+    for (let i = 1; i < sorted.length; i++) {
+      const item = sorted[i];
+      const angle = (i / (sorted.length - 1)) * Math.PI * 2;
+      const distance = 20 + Math.random() * 10;
+
+      const centerX = wall.width / 2;
+      const centerY = eyeLevelHeight;
+
+      const x = centerX + Math.cos(angle) * distance - item.width / 2;
+      const y = centerY + Math.sin(angle) * distance - item.height / 2;
+
+      placements.push({
+        id: item.id,
+        type: item.type,
+        distanceFromLeft: Math.max(
+          margin,
+          Math.min(x, wall.width - item.width - margin)
+        ),
+        distanceFromFloor: Math.max(
+          margin,
+          Math.min(y, wall.height - item.height - margin)
+        ),
+        width: item.width,
+        height: item.height,
+        weight: item.weight,
+        hangingMethod: item.hangingMethod,
+        frameDepth: item.frameDepth,
+        isFramed: item.isFramed,
+      });
+    }
+  }
+
+  return placements;
+}
+
+// Linear layout: single horizontal line at eye level
+function applyLinearLayout(
+  wall: WallDimensions,
+  items: WallItem[],
+  alignment: Alignment,
+  margin: number,
+  eyeLevelHeight: number
+): ShelfPlacement[] {
+  const placements: ShelfPlacement[] = [];
+  const spacing = 6;
+
+  // Calculate total width needed
+  const totalWidth =
+    items.reduce((sum, item) => sum + item.width, 0) +
+    spacing * (items.length - 1);
+
+  let startX = margin;
+  if (alignment === 'center') {
+    startX = (wall.width - totalWidth) / 2;
+  } else if (alignment === 'right') {
+    startX = wall.width - totalWidth - margin;
+  }
+
+  let currentX = startX;
+  items.forEach((item) => {
+    placements.push({
+      id: item.id,
+      type: item.type,
+      distanceFromLeft: currentX,
+      distanceFromFloor: eyeLevelHeight - item.height / 2,
+      width: item.width,
+      height: item.height,
+      weight: item.weight,
+      hangingMethod: item.hangingMethod,
+      frameDepth: item.frameDepth,
+      isFramed: item.isFramed,
+    });
+    currentX += item.width + spacing;
+  });
+
+  return placements;
+}
+
+// Custom layout: user-defined or default centered placement
+function applyCustomLayout(
+  wall: WallDimensions,
+  items: WallItem[],
+  alignment: Alignment,
+  margin: number,
+  eyeLevelHeight: number
+): ShelfPlacement[] {
+  const placements: ShelfPlacement[] = [];
+
+  items.forEach((item, index) => {
+    let x = margin;
+
+    switch (alignment) {
+      case 'center':
+        x = (wall.width - item.width) / 2;
+        break;
+      case 'right':
+        x = wall.width - item.width - margin;
+        break;
+      case 'left':
+      default:
+        x = margin;
+        break;
+    }
+
+    const y = calculateEyeLevelHeight(wall.height, item.height) + index * 12;
+
+    placements.push({
+      id: item.id,
+      type: item.type,
+      distanceFromLeft: x,
+      distanceFromFloor: Math.max(
+        margin,
+        Math.min(y, wall.height - item.height - margin)
+      ),
+      width: item.width,
+      height: item.height,
+      weight: item.weight,
+      hangingMethod: item.hangingMethod,
+      frameDepth: item.frameDepth,
+      isFramed: item.isFramed,
+    });
+  });
+
+  return placements;
+}
+
+// Generate hardware recommendations based on item type and weight
+export function generateHardwareRecommendation(
+  item: WallItem,
+  wallMaterial: WallMaterial
+): HardwareRecommendation {
+  const weight = item.weight || estimateWeight(item);
+  const notes: string[] = [];
+  let hardware = '';
+  let anchorType = '';
+  let screwSize = '';
+  let quantity = 2;
+  let maxWeightCapacity = 0;
+
+  // Determine hardware based on weight
+  if (weight <= 5) {
+    hardware = 'Picture hanging strips or small nails';
+    anchorType = 'Adhesive strips or 1.5" finishing nails';
+    screwSize = 'N/A (nails)';
+    quantity = 2;
+    maxWeightCapacity = 8;
+    notes.push(
+      "For lightweight items, adhesive strips work well and don't damage walls"
+    );
+    notes.push('Use two strips or nails for better stability');
+  } else if (weight <= 15) {
+    hardware = 'Picture hanging hooks with anchors';
+    anchorType = 'Plastic anchors or threaded drywall anchors';
+    screwSize = '#6 or #8 (1.5")';
+    quantity = 2;
+    maxWeightCapacity = 20;
+    notes.push('Use quality picture hanging hooks rated for weight');
+    notes.push('Install anchors first, then hooks');
+  } else if (weight <= 30) {
+    hardware = 'Heavy-duty picture hangers or D-rings';
+    anchorType = 'Toggle bolts or heavy-duty anchors';
+    screwSize = '#10 (2")';
+    quantity = 2;
+    maxWeightCapacity = 40;
+    notes.push('For heavier items, consider mounting into studs');
+    notes.push('Use two hanging points for better distribution');
+  } else if (weight <= 50) {
+    hardware = 'French cleat or heavy-duty brackets';
+    anchorType = 'Toggle bolts into studs (required)';
+    screwSize = '3" wood screws';
+    quantity = 4;
+    maxWeightCapacity = 75;
+    notes.push('⚠️ HEAVY ITEM: Must mount into wall studs');
+    notes.push(
+      'French cleats provide excellent stability for heavy mirrors/art'
+    );
+    notes.push('Use stud finder to locate studs before installation');
+  } else {
+    hardware = 'French cleat or Z-bar mounting system';
+    anchorType = 'Must mount into studs';
+    screwSize = '3-4" lag bolts';
+    quantity = 6;
+    maxWeightCapacity = 100;
+    notes.push('⚠️ VERY HEAVY ITEM: Professional installation recommended');
+    notes.push('Must mount into multiple wall studs');
+    notes.push('Consider using Z-bar or French cleat system');
+  }
+
+  // Add item-specific recommendations
+  if (item.type === 'mirror') {
+    notes.push('Mirrors: Ensure hanging method distributes weight evenly');
+    notes.push('Consider safety backing film for large mirrors');
+  } else if (item.type === 'tv') {
+    notes.push(
+      'TV: Use TV-specific wall mount rated for your TV weight and size'
+    );
+    notes.push('ALWAYS mount TV brackets into wall studs');
+  } else if (item.type === 'artpiece' && item.isFramed) {
+    notes.push('Framed art: Check frame hardware is secure before hanging');
+  }
+
+  // Add hanging method-specific notes
+  if (item.hangingMethod === 'wire') {
+    notes.push('Wire hanging: Keep wire taut and use two hooks for stability');
+  } else if (item.hangingMethod === 'french-cleat') {
+    notes.push('French cleat: Ensures level hanging and easy removal');
+  } else if (item.hangingMethod === 'd-ring') {
+    notes.push('D-rings: Use two rings for balanced hanging');
+  }
+
+  return {
+    itemId: item.id,
+    itemType: item.type,
+    weight,
+    hardware,
+    anchorType,
+    screwSize,
+    quantity,
+    notes,
+    maxWeightCapacity,
+  };
+}
+
+// Estimate weight based on item dimensions and type
+function estimateWeight(item: WallItem): number {
+  const area = item.width * item.height;
+
+  switch (item.type) {
+    case 'picture':
+      return item.isFramed ? area / 100 : area / 200; // framed pictures heavier
+    case 'poster':
+      return area / 300; // posters are light
+    case 'mirror':
+      return area / 50; // mirrors are heavy
+    case 'tv':
+      return area / 30; // TVs vary, but generally heavy
+    case 'artpiece':
+      return area / 80; // varies widely
+    default:
+      return area / 100;
+  }
+}
+
+// Get human-readable label for item type
+function getItemTypeLabel(type: ItemType): string {
+  const labels: Record<ItemType, string> = {
+    shelf: 'Shelf',
+    picture: 'Picture',
+    poster: 'Poster',
+    mirror: 'Mirror',
+    tv: 'TV',
+    artpiece: 'Art Piece',
+  };
+  return labels[type] || 'Item';
+}
+
+// Generate installation instructions based on item types
+function generateInstallationInstructions(
+  items: (ShelfDimensions | WallItem)[],
+  galleryLayout?: GalleryLayout
+): string[] {
+  const hasShel = items.some((i) => i.type === 'shelf');
+  const hasPictures = items.some((i) => i.type !== 'shelf');
+  const instructions: string[] = [];
+
+  if (hasPictures) {
+    instructions.push(
+      '1. Mark center points for each item using measurements provided'
+    );
+    instructions.push('2. Use a level to ensure all items are straight');
+    instructions.push(
+      '3. For pictures: Standard eye level is 57" to center of artwork'
+    );
+
+    if (galleryLayout === 'grid') {
+      instructions.push(
+        '4. Grid layout: Measure spacing carefully for uniform appearance'
+      );
+    } else if (galleryLayout === 'salon') {
+      instructions.push(
+        '4. Salon layout: Start with largest piece at center, work outward'
+      );
+    } else if (galleryLayout === 'linear') {
+      instructions.push(
+        '4. Linear layout: Ensure all items align at same height'
+      );
+    }
+
+    instructions.push(
+      '5. Install appropriate hardware based on weight (see recommendations)'
+    );
+    instructions.push(
+      '6. For items over 15 lbs, locate and use wall studs when possible'
+    );
+  }
+
+  if (hasShel) {
+    instructions.push(
+      '• Shelves: Use stud finder and ensure brackets are level'
+    );
+    instructions.push(
+      '• Heavy shelves (>30 lbs expected load) must mount into studs'
+    );
+  }
+
+  instructions.push(
+    '⚠️ Safety: Always use appropriate hardware for item weight'
+  );
+  instructions.push(
+    '📏 Tip: Create paper templates to visualize arrangement before drilling'
+  );
+
+  return instructions;
 }

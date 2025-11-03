@@ -3,13 +3,14 @@ import {
   ShelfDimensions,
   Obstruction,
   ProjectSettings,
+  WallItem,
 } from '../types';
 
 export interface SavedProject {
   id: string;
   name: string;
   wall: WallDimensions;
-  shelves: ShelfDimensions[];
+  shelves: (ShelfDimensions | WallItem)[];
   obstructions: Obstruction[];
   settings: ProjectSettings;
   savedAt: string;
@@ -21,7 +22,7 @@ const CURRENT_PROJECT_KEY = 'spotOnShelves_currentProject';
 export function saveProject(
   name: string,
   wall: WallDimensions,
-  shelves: ShelfDimensions[],
+  shelves: (ShelfDimensions | WallItem)[],
   obstructions: Obstruction[],
   settings: ProjectSettings
 ): SavedProject {

@@ -133,7 +133,8 @@ export function MeasurementOutput({
                 className='bg-white rounded-lg p-4 border border-gray-200'
               >
                 <h4 className='font-medium text-gray-900 mb-2'>
-                  Shelf {index + 1} Marking
+                  {shelf.type.charAt(0).toUpperCase() + shelf.type.slice(1)}{' '}
+                  {index + 1} Marking
                 </h4>
                 <p className='text-sm text-gray-700'>
                   <strong>Step 1:</strong> Starting from the left corner of your
@@ -152,9 +153,9 @@ export function MeasurementOutput({
                 </p>
                 <p className='text-sm text-gray-700 mt-2'>
                   <strong>Step 3:</strong> This intersection point is the{' '}
-                  <strong>bottom-left corner</strong> of your shelf.
+                  <strong>bottom-left corner</strong> of your {shelf.type}.
                 </p>
-                {bracketPositions.length > 0 && (
+                {bracketPositions.length > 0 && shelf.type === 'shelf' && (
                   <div className='mt-3 pt-3 border-t border-gray-200'>
                     <p className='text-sm text-gray-700'>
                       <strong>Step 4:</strong> Mark bracket positions from the
@@ -177,6 +178,75 @@ export function MeasurementOutput({
           })}
         </div>
       </div>
+
+      {/* Hardware Recommendations for Wall Items */}
+      {result.hardwareRecommendations &&
+        result.hardwareRecommendations.length > 0 && (
+          <div className='mt-8 bg-purple-50 rounded-lg p-6 border border-purple-200'>
+            <h3 className='text-lg font-semibold text-purple-900 mb-4'>
+              Hardware Recommendations
+            </h3>
+            <div className='space-y-4'>
+              {result.hardwareRecommendations.map((rec, index) => (
+                <div
+                  key={rec.itemId}
+                  className='bg-white rounded-lg p-4 border border-purple-200'
+                >
+                  <div className='flex items-start justify-between mb-3'>
+                    <h4 className='font-medium text-purple-900'>
+                      {rec.itemType.charAt(0).toUpperCase() +
+                        rec.itemType.slice(1)}{' '}
+                      #{index + 1}
+                    </h4>
+                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800'>
+                      {rec.weight} lbs
+                    </span>
+                  </div>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-3 mb-3'>
+                    <div>
+                      <span className='text-sm text-gray-600'>Hardware:</span>
+                      <div className='font-semibold text-gray-900'>
+                        {rec.hardware}
+                      </div>
+                    </div>
+                    <div>
+                      <span className='text-sm text-gray-600'>
+                        Anchor Type:
+                      </span>
+                      <div className='font-semibold text-gray-900'>
+                        {rec.anchorType}
+                      </div>
+                    </div>
+                    <div>
+                      <span className='text-sm text-gray-600'>Screw Size:</span>
+                      <div className='font-semibold text-gray-900'>
+                        {rec.screwSize}
+                      </div>
+                    </div>
+                    <div>
+                      <span className='text-sm text-gray-600'>
+                        Quantity Needed:
+                      </span>
+                      <div className='font-semibold text-gray-900'>
+                        {rec.quantity} pieces
+                      </div>
+                    </div>
+                  </div>
+                  <div className='bg-blue-50 rounded p-3'>
+                    <div className='text-sm font-medium text-blue-900 mb-1'>
+                      Max Capacity: {rec.maxWeightCapacity} lbs
+                    </div>
+                    <ul className='text-xs text-blue-800 space-y-1'>
+                      {rec.notes.map((note, i) => (
+                        <li key={i}>• {note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
     </div>
   );
 }

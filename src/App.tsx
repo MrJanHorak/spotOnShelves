@@ -17,11 +17,13 @@ import {
   Obstruction,
   ProjectSettings,
   CalculationResult,
+  WallItem,
 } from './types';
 import {
   validateInputs,
   calculateOptimalPlacement,
   calculateStudLocations,
+  calculateWallItemPlacement,
 } from './utils/calculations';
 import { MaterialCalculator } from './components/MaterialCalculator';
 import {
@@ -37,9 +39,9 @@ import boltLogo from './assets/black_circle_360x360.png';
 
 function App() {
   const [wall, setWall] = useState<WallDimensions>({ width: 96, height: 96 });
-  const [shelves, setShelves] = useState<ShelfDimensions[]>([
-    { id: 'shelf-1', width: 36, depth: 8 },
-    { id: 'shelf-2', width: 24, depth: 6 },
+  const [shelves, setShelves] = useState<(ShelfDimensions | WallItem)[]>([
+    { id: 'shelf-1', type: 'shelf', width: 36, height: 1, depth: 8 },
+    { id: 'shelf-2', type: 'shelf', width: 24, height: 1, depth: 6 },
   ]);
   const [obstructions, setObstructions] = useState<Obstruction[]>([]);
   const [settings, setSettings] = useState<ProjectSettings>({
@@ -70,7 +72,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const validationErrors = validateInputs(wall, shelves, obstructions);
+    // Split items into shelves and wall items for validation
+    const shelvesOnly = shelves.filter(
+      (item): item is ShelfDimensions => item.type === 'shelf'
+    );
+    const validationErrors = validateInputs(wall, shelvesOnly, obstructions);
     setErrors(validationErrors);
 
     if (validationErrors.length === 0 && shelves.length > 0) {
@@ -86,13 +92,30 @@ function App() {
             )
         : undefined;
 
-      const calculationResult = calculateOptimalPlacement(
-        wall,
-        shelves,
-        obstructions,
-        settings.alignment,
-        studLocs
-      );
+      // Check if we have any wall items (pictures, etc.)
+      const hasWallItems = shelves.some((item) => item.type !== 'shelf');
+
+      let calculationResult: CalculationResult;
+      if (hasWallItems) {
+        // Use the new calculation function that handles both shelves and wall items
+        calculationResult = calculateWallItemPlacement(
+          wall,
+          shelves,
+          obstructions,
+          settings.alignment,
+          settings.galleryLayout || 'custom',
+          settings.eyeLevelHeight || 57
+        );
+      } else {
+        // Use the original shelf-only calculation
+        calculationResult = calculateOptimalPlacement(
+          wall,
+          shelvesOnly,
+          obstructions,
+          settings.alignment,
+          studLocs
+        );
+      }
       setResult(calculationResult);
     } else {
       setResult({ shelves: [], measurements: [], instructions: [] });
@@ -105,6 +128,8 @@ function App() {
     settings.enableStudDetection,
     settings.studSpacing,
     settings.customStudLocations,
+    settings.galleryLayout,
+    settings.eyeLevelHeight,
   ]);
 
   const handleSaveProject = () => {

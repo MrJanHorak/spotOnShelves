@@ -1,5 +1,23 @@
 export type Unit = 'inches' | 'cm';
 
+export type ItemType =
+  | 'shelf'
+  | 'picture'
+  | 'poster'
+  | 'mirror'
+  | 'tv'
+  | 'artpiece';
+
+export type HangingMethod =
+  | 'wire'
+  | 'sawtooth'
+  | 'keyhole'
+  | 'french-cleat'
+  | 'd-ring'
+  | 'bracket';
+
+export type GalleryLayout = 'grid' | 'salon' | 'linear' | 'custom';
+
 export type ObstructionType =
   | 'bed'
   | 'cabinet'
@@ -19,11 +37,25 @@ export interface WallDimensions {
   height: number;
 }
 
-export interface ShelfDimensions {
-  width: number;
-  depth: number;
+export interface BaseItem {
   id: string;
-  expectedWeight?: number; // in pounds
+  type: ItemType;
+  width: number;
+  height: number;
+  weight?: number; // in pounds
+}
+
+export interface ShelfDimensions extends BaseItem {
+  type: 'shelf';
+  depth: number;
+  expectedWeight?: number; // backwards compatibility
+}
+
+export interface WallItem extends BaseItem {
+  type: 'picture' | 'poster' | 'mirror' | 'tv' | 'artpiece';
+  frameDepth?: number;
+  hangingMethod?: HangingMethod;
+  isFramed?: boolean;
 }
 
 export interface Obstruction {
@@ -37,11 +69,17 @@ export interface Obstruction {
 
 export interface ShelfPlacement {
   id: string;
+  type: ItemType;
   distanceFromLeft: number;
   distanceFromFloor: number;
   width: number;
-  depth: number;
-  expectedWeight?: number;
+  height: number;
+  depth?: number; // for shelves
+  weight?: number;
+  expectedWeight?: number; // backwards compatibility
+  hangingMethod?: HangingMethod;
+  frameDepth?: number;
+  isFramed?: boolean;
 }
 
 export interface CalculationResult {
@@ -49,6 +87,8 @@ export interface CalculationResult {
   verticalSpacing?: number;
   measurements: string[];
   instructions: string[];
+  hardwareRecommendations?: HardwareRecommendation[];
+  galleryLayout?: GalleryLayout;
 }
 
 export interface ProjectSettings {
@@ -59,6 +99,20 @@ export interface ProjectSettings {
   studSpacing?: number; // 16 or 24 inches on center
   customStudLocations?: number[]; // custom stud positions from left edge
   enableStudDetection?: boolean;
+  galleryLayout?: GalleryLayout;
+  eyeLevelHeight?: number; // default 57-60 inches for picture center
+}
+
+export interface HardwareRecommendation {
+  itemId: string;
+  itemType: ItemType;
+  weight: number;
+  hardware: string;
+  anchorType: string;
+  screwSize: string;
+  quantity: number;
+  notes: string[];
+  maxWeightCapacity: number;
 }
 
 // Material estimate returned by the material calculator
