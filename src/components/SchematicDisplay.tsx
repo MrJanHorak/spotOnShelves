@@ -62,8 +62,8 @@ export function SchematicDisplay({
     }, 120);
   }
   // Calculate scale to fit within container
-  const containerWidth = 600;
-  const containerHeight = 400;
+  const containerWidth = 700;
+  const containerHeight = 350;
   const scale =
     Math.min(
       containerWidth / Math.max(wall.width, 1),
@@ -271,24 +271,46 @@ export function SchematicDisplay({
 
                 const colors = getItemColor();
                 const itemHeight = item.height || 1;
+                const itemX = offsetX + item.distanceFromLeft * scale;
+                const itemY =
+                  offsetY +
+                  (wall.height - item.distanceFromFloor - itemHeight) * scale;
+                const itemWidth = item.width * scale;
+                const itemHeightScaled = itemHeight * scale;
+
+                // Determine if item is circular/oval based on shape
+                const isCircular =
+                  item.type === 'mirror' &&
+                  (item.shape === 'circle' || item.shape === 'oval');
 
                 return (
                   <g key={item.id}>
-                    <rect
-                      x={offsetX + item.distanceFromLeft * scale}
-                      y={
-                        offsetY +
-                        (wall.height - item.distanceFromFloor - itemHeight) *
-                          scale
-                      }
-                      width={item.width * scale}
-                      height={itemHeight * scale}
-                      fill={colors.fill}
-                      stroke={colors.stroke}
-                      strokeWidth='2'
-                      rx='1'
-                      opacity={item.type === 'shelf' ? 1 : 0.85}
-                    />
+                    {isCircular ? (
+                      // Render ellipse for circle/oval mirrors
+                      <ellipse
+                        cx={itemX + itemWidth / 2}
+                        cy={itemY + itemHeightScaled / 2}
+                        rx={itemWidth / 2}
+                        ry={itemHeightScaled / 2}
+                        fill={colors.fill}
+                        stroke={colors.stroke}
+                        strokeWidth='2'
+                        opacity={item.type === 'shelf' ? 1 : 0.85}
+                      />
+                    ) : (
+                      // Render rectangle for all other items
+                      <rect
+                        x={itemX}
+                        y={itemY}
+                        width={itemWidth}
+                        height={itemHeightScaled}
+                        fill={colors.fill}
+                        stroke={colors.stroke}
+                        strokeWidth='2'
+                        rx='1'
+                        opacity={item.type === 'shelf' ? 1 : 0.85}
+                      />
+                    )}
                     <text
                       x={
                         offsetX +

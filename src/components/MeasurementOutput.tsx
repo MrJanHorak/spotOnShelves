@@ -30,7 +30,7 @@ export function MeasurementOutput({
       : null;
 
   return (
-    <div className='bg-white rounded-xl shadow-lg p-6'>
+    <div className='space-y-6'>
       <h2 className='text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2'>
         <Ruler className='h-6 w-6 text-green-600' />
         Precise Measurements

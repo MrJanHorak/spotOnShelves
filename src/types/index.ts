@@ -18,6 +18,8 @@ export type HangingMethod =
 
 export type GalleryLayout = 'grid' | 'salon' | 'linear' | 'custom';
 
+export type ItemShape = 'rectangle' | 'square' | 'circle' | 'oval';
+
 export type ObstructionType =
   | 'bed'
   | 'cabinet'
@@ -43,6 +45,11 @@ export interface BaseItem {
   width: number;
   height: number;
   weight?: number; // in pounds
+  manualPosition?: {
+    distanceFromLeft: number;
+    distanceFromFloor: number;
+  };
+  locked?: boolean; // prevent automatic repositioning
 }
 
 export interface ShelfDimensions extends BaseItem {
@@ -56,6 +63,7 @@ export interface WallItem extends BaseItem {
   frameDepth?: number;
   hangingMethod?: HangingMethod;
   isFramed?: boolean;
+  shape?: ItemShape;
 }
 
 export interface Obstruction {
@@ -80,6 +88,7 @@ export interface ShelfPlacement {
   hangingMethod?: HangingMethod;
   frameDepth?: number;
   isFramed?: boolean;
+  shape?: ItemShape;
 }
 
 export interface CalculationResult {
@@ -101,6 +110,10 @@ export interface ProjectSettings {
   enableStudDetection?: boolean;
   galleryLayout?: GalleryLayout;
   eyeLevelHeight?: number; // default 57-60 inches for picture center
+  autoArrange?: boolean; // enable/disable automatic arrangement
+  snapToGrid?: boolean; // snap items to grid for alignment
+  gridSize?: number; // grid size in inches (default 1)
+  minSpacing?: number; // minimum spacing between items in inches
 }
 
 export interface HardwareRecommendation {

@@ -6,6 +6,10 @@ import {
   FolderOpen,
   Download,
   Upload,
+  Settings,
+  Ruler,
+  Hammer,
+  BookOpen,
 } from 'lucide-react';
 import { InputSection } from './components/InputSection';
 import { SchematicDisplay } from './components/SchematicDisplay';
@@ -24,6 +28,8 @@ import {
   calculateOptimalPlacement,
   calculateStudLocations,
   calculateWallItemPlacement,
+  checkItemObstructionConflicts,
+  checkPlacedItemConflicts,
 } from './utils/calculations';
 import { MaterialCalculator } from './components/MaterialCalculator';
 import {
@@ -49,6 +55,10 @@ function App() {
     wallMaterial: 'drywall',
     mountingType: 'floating',
     alignment: 'center',
+    autoArrange: true,
+    snapToGrid: true,
+    gridSize: 1,
+    minSpacing: 2,
   });
 
   const [errors, setErrors] = useState<string[]>([]);
@@ -65,6 +75,9 @@ function App() {
     useState<string>('Untitled Project');
   const [showLoadDialog, setShowLoadDialog] = useState<boolean>(false);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [activeTab, setActiveTab] = useState<
+    'setup' | 'measurements' | 'materials' | 'guidance'
+  >('setup');
 
   // Load saved projects on mount
   useEffect(() => {
@@ -77,7 +90,6 @@ function App() {
       (item): item is ShelfDimensions => item.type === 'shelf'
     );
     const validationErrors = validateInputs(wall, shelvesOnly, obstructions);
-    setErrors(validationErrors);
 
     if (validationErrors.length === 0 && shelves.length > 0) {
       // Calculate stud locations if enabled
@@ -104,7 +116,8 @@ function App() {
           obstructions,
           settings.alignment,
           settings.galleryLayout || 'custom',
-          settings.eyeLevelHeight || 57
+          settings.eyeLevelHeight || 57,
+          settings.autoArrange ?? true
         );
       } else {
         // Use the original shelf-only calculation
@@ -116,10 +129,28 @@ function App() {
           studLocs
         );
       }
+
+      // Check for conflicts between placed items and obstructions
+      if (calculationResult.shelves.length > 0) {
+        const conflictErrors = checkItemObstructionConflicts(
+          calculationResult.shelves,
+          obstructions
+        );
+        validationErrors.push(...conflictErrors);
+
+        // Also check for item-to-item conflicts
+        const itemConflictErrors = checkPlacedItemConflicts(
+          calculationResult.shelves
+        );
+        validationErrors.push(...itemConflictErrors);
+      }
+
       setResult(calculationResult);
     } else {
       setResult({ shelves: [], measurements: [], instructions: [] });
     }
+
+    setErrors(validationErrors);
   }, [
     wall,
     shelves,
@@ -130,6 +161,7 @@ function App() {
     settings.customStudLocations,
     settings.galleryLayout,
     settings.eyeLevelHeight,
+    settings.autoArrange,
   ]);
 
   const handleSaveProject = () => {
@@ -286,45 +318,11 @@ function App() {
         </div>
       </header>
 
-      <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {/* Error Display */}
-        {errors.length > 0 && (
-          <div className='mb-8 bg-red-50 border border-red-200 rounded-xl p-4'>
-            <div className='flex items-start gap-3'>
-              <AlertCircle className='h-5 w-5 text-red-600 flex-shrink-0 mt-0.5' />
-              <div>
-                <h3 className='font-semibold text-red-900 mb-2'>
-                  Please fix the following issues:
-                </h3>
-                <ul className='space-y-1'>
-                  {errors.map((error, index) => (
-                    <li key={index} className='text-red-800 text-sm'>
-                      • {error}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className='space-y-8'>
-          {/* Input Section */}
-          <InputSection
-            wall={wall}
-            shelves={shelves}
-            obstructions={obstructions}
-            settings={settings}
-            onWallChange={setWall}
-            onShelvesChange={setShelves}
-            onObstructionsChange={setObstructions}
-            onSettingsChange={setSettings}
-          />
-
-          {/* Results Section */}
-          {errors.length === 0 && result.shelves.length > 0 && (
-            <>
-              {/* Schematic Display */}
+      <main className='flex flex-col h-[calc(100vh-8rem)]'>
+        {/* Sticky Schematic Section */}
+        {result.shelves.length > 0 && (
+          <div className='bg-white border-b border-gray-200 shadow-md'>
+            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
               <SchematicDisplay
                 wall={wall}
                 obstructions={obstructions}
@@ -339,36 +337,161 @@ function App() {
                 customStudLocations={settings.customStudLocations}
                 enableStudDetection={settings.enableStudDetection}
               />
+            </div>
+          </div>
+        )}
 
-              {/* Measurement Output */}
-              <MeasurementOutput
-                result={result}
-                unit={settings.unit}
-                wallMaterial={settings.wallMaterial}
-                mountingType={settings.mountingType}
-                useStuds={useStuds}
-              />
+        {/* Scrollable Content Section */}
+        <div className='flex-1 overflow-y-auto'>
+          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+            {/* Error Display */}
+            {errors.length > 0 && (
+              <div className='mb-8 bg-red-50 border border-red-200 rounded-xl p-4'>
+                <div className='flex items-start gap-3'>
+                  <AlertCircle className='h-5 w-5 text-red-600 flex-shrink-0 mt-0.5' />
+                  <div className='flex-1'>
+                    <h3 className='font-semibold text-red-900 mb-2'>
+                      Please fix the following issues:
+                    </h3>
+                    <ul className='space-y-1 mb-3'>
+                      {errors.map((error, index) => (
+                        <li key={index} className='text-red-800 text-sm'>
+                          • {error}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className='mt-3 pt-3 border-t border-red-200'>
+                      <p className='text-sm text-red-700 font-medium mb-2'>
+                        💡 How to fix overlaps:
+                      </p>
+                      <ul className='text-xs text-red-700 space-y-1 ml-4'>
+                        <li>
+                          • Use the <strong>Position Controls</strong> below
+                          each item to manually adjust positions
+                        </li>
+                        <li>
+                          • Check the <strong>Wall Schematic</strong> above to
+                          see where items overlap
+                        </li>
+                        <li>
+                          • Click the <strong>lock icon 🔓</strong> to enable
+                          manual positioning for a specific item
+                        </li>
+                        <li>
+                          • Or uncheck <strong>"Auto-arrange items"</strong> in
+                          Project Settings to position all items manually
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-              {/* Material Calculator */}
-              <MaterialCalculator
-                placedShelves={result.shelves}
-                settings={settings}
-                useStuds={useStuds}
-                onToggleUseStuds={setUseStuds}
-                selectedShelfId={selectedShelfId}
-                onSelectShelf={(id) =>
-                  setSelectedShelfId((prev) => (prev === id ? null : id))
-                }
-                onHoverShelf={(id) => setHoveredShelfId(id)}
-                wall={wall}
-                obstructions={obstructions}
-                result={result}
-              />
-            </>
-          )}
+            {/* Tabbed Interface */}
+            <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
+              {/* Tab Headers */}
+              <div className='flex border-b border-gray-200 bg-gray-50'>
+                <button
+                  onClick={() => setActiveTab('setup')}
+                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                    activeTab === 'setup'
+                      ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <Settings className='h-4 w-4' />
+                  Setup & Configuration
+                </button>
+                <button
+                  onClick={() => setActiveTab('measurements')}
+                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                    activeTab === 'measurements'
+                      ? 'bg-white text-green-600 border-b-2 border-green-600'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                  disabled={result.shelves.length === 0 || errors.length > 0}
+                >
+                  <Ruler className='h-4 w-4' />
+                  Measurements & Instructions
+                </button>
+                <button
+                  onClick={() => setActiveTab('materials')}
+                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                    activeTab === 'materials'
+                      ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                  disabled={result.shelves.length === 0 || errors.length > 0}
+                >
+                  <Hammer className='h-4 w-4' />
+                  Materials & Export
+                </button>
+                <button
+                  onClick={() => setActiveTab('guidance')}
+                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                    activeTab === 'guidance'
+                      ? 'bg-white text-purple-600 border-b-2 border-purple-600'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <BookOpen className='h-4 w-4' />
+                  Tools & Guidance
+                </button>
+              </div>
 
-          {/* Tools and Guidance */}
-          <ToolsAndGuidance settings={settings} />
+              {/* Tab Content */}
+              <div className='p-6'>
+                {activeTab === 'setup' && (
+                  <InputSection
+                    wall={wall}
+                    shelves={shelves}
+                    obstructions={obstructions}
+                    settings={settings}
+                    onWallChange={setWall}
+                    onShelvesChange={setShelves}
+                    onObstructionsChange={setObstructions}
+                    onSettingsChange={setSettings}
+                  />
+                )}
+
+                {activeTab === 'measurements' &&
+                  result.shelves.length > 0 &&
+                  errors.length === 0 && (
+                    <MeasurementOutput
+                      result={result}
+                      unit={settings.unit}
+                      wallMaterial={settings.wallMaterial}
+                      mountingType={settings.mountingType}
+                      useStuds={useStuds}
+                    />
+                  )}
+
+                {activeTab === 'materials' &&
+                  result.shelves.length > 0 &&
+                  errors.length === 0 && (
+                    <MaterialCalculator
+                      placedShelves={result.shelves}
+                      settings={settings}
+                      useStuds={useStuds}
+                      onToggleUseStuds={setUseStuds}
+                      selectedShelfId={selectedShelfId}
+                      onSelectShelf={(id) =>
+                        setSelectedShelfId((prev) => (prev === id ? null : id))
+                      }
+                      onHoverShelf={(id) => setHoveredShelfId(id)}
+                      wall={wall}
+                      obstructions={obstructions}
+                      result={result}
+                    />
+                  )}
+
+                {activeTab === 'guidance' && (
+                  <ToolsAndGuidance settings={settings} />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

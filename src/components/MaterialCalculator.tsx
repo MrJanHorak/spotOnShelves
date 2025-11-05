@@ -63,7 +63,7 @@ export function MaterialCalculator({
   );
 
   return (
-    <div className='bg-white rounded-xl shadow-lg p-6'>
+    <div className='space-y-6'>
       <h2 className='text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2'>
         <Hammer className='h-6 w-6 text-indigo-600' />
         Material Estimate

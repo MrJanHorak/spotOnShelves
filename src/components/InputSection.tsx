@@ -13,8 +13,10 @@ import {
   ItemType,
   HangingMethod,
   GalleryLayout,
+  ItemShape,
 } from '../types';
 import { ItemTypeSelector } from './ItemTypeSelector';
+import { ItemPositioning } from './ItemPositioning';
 
 interface InputSectionProps {
   wall: WallDimensions;
@@ -107,7 +109,7 @@ export function InputSection({
   };
 
   return (
-    <div className='bg-white rounded-xl shadow-lg p-6 space-y-8'>
+    <div className='space-y-8'>
       {/* Project Settings */}
       <div>
         <h2 className='text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2'>
@@ -187,6 +189,96 @@ export function InputSection({
               <option value='center'>Center Aligned</option>
               <option value='right'>Right Aligned</option>
             </select>
+          </div>
+        </div>
+
+        {/* Positioning Controls */}
+        <div className='mt-4 border-t pt-4'>
+          <h4 className='text-sm font-semibold text-gray-900 mb-3'>
+            Positioning Options
+          </h4>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='flex items-center gap-2'>
+              <input
+                type='checkbox'
+                id='auto-arrange'
+                checked={settings.autoArrange ?? true}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    autoArrange: e.target.checked,
+                  })
+                }
+                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+              />
+              <label
+                htmlFor='auto-arrange'
+                className='text-sm font-medium text-gray-700'
+              >
+                Auto-arrange items
+              </label>
+            </div>
+
+            <div className='flex items-center gap-2'>
+              <input
+                type='checkbox'
+                id='snap-to-grid'
+                checked={settings.snapToGrid ?? true}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    snapToGrid: e.target.checked,
+                  })
+                }
+                className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+              />
+              <label
+                htmlFor='snap-to-grid'
+                className='text-sm font-medium text-gray-700'
+              >
+                Snap to grid
+              </label>
+            </div>
+
+            {settings.snapToGrid && (
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Grid Size ({settings.unit === 'inches' ? 'in' : 'cm'})
+                </label>
+                <input
+                  type='number'
+                  value={settings.gridSize ?? 1}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      gridSize: parseFloat(e.target.value) || 1,
+                    })
+                  }
+                  className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  min='0.25'
+                  step='0.25'
+                />
+              </div>
+            )}
+
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Minimum Spacing ({settings.unit === 'inches' ? 'in' : 'cm'})
+              </label>
+              <input
+                type='number'
+                value={settings.minSpacing ?? 2}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    minSpacing: parseFloat(e.target.value) || 2,
+                  })
+                }
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                min='0'
+                step='0.5'
+              />
+            </div>
           </div>
         </div>
 
@@ -359,6 +451,19 @@ export function InputSection({
                         depth: 8,
                         height: 1,
                       });
+                    } else if (newType === 'tv') {
+                      updateShelf(item.id, {
+                        type: newType,
+                        height: 24,
+                        hangingMethod: 'bracket',
+                      });
+                    } else if (newType === 'mirror') {
+                      updateShelf(item.id, {
+                        type: newType,
+                        height: 24,
+                        hangingMethod: 'wire',
+                        shape: 'rectangle',
+                      });
                     } else {
                       updateShelf(item.id, {
                         type: newType,
@@ -373,20 +478,47 @@ export function InputSection({
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
                   <label className='block text-sm font-medium text-gray-700 mb-1'>
-                    Width ({settings.unit === 'inches' ? 'in' : 'cm'})
+                    {item.type === 'mirror' &&
+                    ((item as WallItem).shape === 'circle' ||
+                      (item as WallItem).shape === 'square')
+                      ? 'Diameter / Size'
+                      : 'Width'}{' '}
+                    ({settings.unit === 'inches' ? 'in' : 'cm'})
                   </label>
                   <input
                     type='number'
                     value={item.width}
-                    onChange={(e) =>
-                      updateShelf(item.id, {
-                        width: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                    onChange={(e) => {
+                      const newWidth = parseFloat(e.target.value) || 0;
+                      // For circles and squares, sync width and height
+                      if (
+                        item.type === 'mirror' &&
+                        ((item as WallItem).shape === 'circle' ||
+                          (item as WallItem).shape === 'square')
+                      ) {
+                        updateShelf(item.id, {
+                          width: newWidth,
+                          height: newWidth,
+                        });
+                      } else {
+                        updateShelf(item.id, {
+                          width: newWidth,
+                        });
+                      }
+                    }}
                     className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                     min='0'
                     step='0.1'
                   />
+                  {item.type === 'mirror' &&
+                    ((item as WallItem).shape === 'circle' ||
+                      (item as WallItem).shape === 'square') && (
+                      <p className='text-xs text-blue-600 mt-1'>
+                        {(item as WallItem).shape === 'circle'
+                          ? '⭕ Width and height are locked for circles'
+                          : '⬜ Width and height are locked for squares'}
+                      </p>
+                    )}
                 </div>
 
                 {item.type === 'shelf' ? (
@@ -415,15 +547,40 @@ export function InputSection({
                     <input
                       type='number'
                       value={item.height}
-                      onChange={(e) =>
-                        updateShelf(item.id, {
-                          height: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                      onChange={(e) => {
+                        const newHeight = parseFloat(e.target.value) || 0;
+                        // For circles and squares, sync width and height
+                        if (
+                          item.type === 'mirror' &&
+                          ((item as WallItem).shape === 'circle' ||
+                            (item as WallItem).shape === 'square')
+                        ) {
+                          updateShelf(item.id, {
+                            width: newHeight,
+                            height: newHeight,
+                          });
+                        } else {
+                          updateShelf(item.id, {
+                            height: newHeight,
+                          });
+                        }
+                      }}
                       className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                       min='0'
                       step='0.1'
+                      disabled={
+                        item.type === 'mirror' &&
+                        ((item as WallItem).shape === 'circle' ||
+                          (item as WallItem).shape === 'square')
+                      }
                     />
+                    {item.type === 'mirror' &&
+                      ((item as WallItem).shape === 'circle' ||
+                        (item as WallItem).shape === 'square') && (
+                        <p className='text-xs text-gray-500 mt-1'>
+                          Locked to match width
+                        </p>
+                      )}
                   </div>
                 )}
 
@@ -469,7 +626,10 @@ export function InputSection({
                         Hanging Method
                       </label>
                       <select
-                        value={(item as WallItem).hangingMethod || 'wire'}
+                        value={
+                          (item as WallItem).hangingMethod ||
+                          (item.type === 'tv' ? 'bracket' : 'wire')
+                        }
                         onChange={(e) =>
                           updateShelf(item.id, {
                             hangingMethod: e.target.value as HangingMethod,
@@ -477,14 +637,70 @@ export function InputSection({
                         }
                         className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                       >
-                        <option value='wire'>Wire</option>
-                        <option value='sawtooth'>Sawtooth Hanger</option>
-                        <option value='keyhole'>Keyhole</option>
-                        <option value='french-cleat'>French Cleat</option>
-                        <option value='d-ring'>D-Ring</option>
-                        <option value='bracket'>Bracket</option>
+                        {item.type === 'tv' ? (
+                          <>
+                            <option value='bracket'>Bracket</option>
+                            <option value='french-cleat'>French Cleat</option>
+                            <option value='keyhole'>Keyhole</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value='wire'>Wire</option>
+                            <option value='sawtooth'>Sawtooth Hanger</option>
+                            <option value='keyhole'>Keyhole</option>
+                            <option value='french-cleat'>French Cleat</option>
+                            <option value='d-ring'>D-Ring</option>
+                            <option value='bracket'>Bracket</option>
+                          </>
+                        )}
                       </select>
                     </div>
+
+                    {item.type === 'mirror' && (
+                      <div>
+                        <label className='block text-sm font-medium text-gray-700 mb-1'>
+                          Mirror Shape
+                        </label>
+                        <select
+                          value={(item as WallItem).shape || 'rectangle'}
+                          onChange={(e) => {
+                            const newShape = e.target.value as ItemShape;
+                            // When changing to circle or square, sync dimensions
+                            if (
+                              newShape === 'circle' ||
+                              newShape === 'square'
+                            ) {
+                              // Use the larger of width/height to avoid shrinking
+                              const size = Math.max(item.width, item.height);
+                              updateShelf(item.id, {
+                                shape: newShape,
+                                width: size,
+                                height: size,
+                              });
+                            } else {
+                              updateShelf(item.id, {
+                                shape: newShape,
+                              });
+                            }
+                          }}
+                          className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        >
+                          <option value='rectangle'>Rectangle</option>
+                          <option value='square'>Square</option>
+                          <option value='circle'>Circle / Round</option>
+                          <option value='oval'>Oval</option>
+                        </select>
+                        {((item as WallItem).shape === 'circle' ||
+                          (item as WallItem).shape === 'square') && (
+                          <p className='text-xs text-blue-600 mt-1'>
+                            💡 Dimensions are automatically synced for{' '}
+                            {(item as WallItem).shape === 'circle'
+                              ? 'circles'
+                              : 'squares'}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {item.type === 'picture' && (
                       <div className='flex items-center gap-2'>
@@ -510,6 +726,19 @@ export function InputSection({
                   </>
                 )}
               </div>
+
+              {/* Manual Positioning Controls */}
+              <ItemPositioning
+                item={item}
+                index={index}
+                wallWidth={wall.width}
+                wallHeight={wall.height}
+                unit={settings.unit}
+                autoArrange={settings.autoArrange ?? true}
+                snapToGrid={settings.snapToGrid ?? true}
+                gridSize={settings.gridSize ?? 1}
+                onUpdate={(id, updates) => updateShelf(id, updates)}
+              />
             </div>
           ))}
           {shelves.length === 0 && (
@@ -540,9 +769,29 @@ export function InputSection({
               <option value='salon'>Salon Style</option>
               <option value='linear'>Linear (Single Row)</option>
             </select>
-            <p className='text-xs text-gray-600 mt-2'>
-              Choose a layout pattern for pictures, posters, and art pieces
-            </p>
+
+            {/* Layout Descriptions */}
+            <div className='mt-3 p-3 bg-white rounded border border-purple-200'>
+              <p className='text-xs font-semibold text-purple-900 mb-2'>
+                {settings.galleryLayout === 'grid' && '📊 Grid Layout'}
+                {settings.galleryLayout === 'salon' && '🎨 Salon Style'}
+                {settings.galleryLayout === 'linear' && '➡️ Linear Layout'}
+                {(!settings.galleryLayout ||
+                  settings.galleryLayout === 'custom') &&
+                  '✏️ Custom Layout'}
+              </p>
+              <p className='text-xs text-gray-700'>
+                {settings.galleryLayout === 'grid' &&
+                  'Items arranged in evenly-spaced rows and columns, centered around eye level. Perfect for uniform collections or photo galleries.'}
+                {settings.galleryLayout === 'salon' &&
+                  'Largest piece at eye level center, others clustered organically around it. Classic museum/gallery style for varied sizes.'}
+                {settings.galleryLayout === 'linear' &&
+                  'All items in a single horizontal row at eye level. Great for hallways or above furniture.'}
+                {(!settings.galleryLayout ||
+                  settings.galleryLayout === 'custom') &&
+                  'Manually position each item using the Position Controls below. Use eye level as a reference guide.'}
+              </p>
+            </div>
 
             <div className='mt-3'>
               <label className='block text-sm font-medium text-gray-700 mb-1'>
@@ -565,7 +814,11 @@ export function InputSection({
                 step='1'
               />
               <p className='text-xs text-gray-600 mt-1'>
-                Standard gallery height is 57-60 inches from floor to center
+                {settings.galleryLayout === 'grid' ||
+                settings.galleryLayout === 'salon' ||
+                settings.galleryLayout === 'linear'
+                  ? 'Used as the vertical center point for the layout'
+                  : 'Standard gallery height is 57-60 inches from floor to center'}
               </p>
             </div>
           </div>

@@ -17,6 +17,22 @@ import {
   GalleryLayout,
 } from '../types';
 
+// Helper function to check if two rectangles overlap
+function checkOverlap(
+  rect1: { x: number; y: number; width: number; height: number },
+  rect2: { x: number; y: number; width: number; height: number }
+): boolean {
+  const horizontalOverlap = !(
+    rect1.x + rect1.width <= rect2.x || rect2.x + rect2.width <= rect1.x
+  );
+
+  const verticalOverlap = !(
+    rect1.y + rect1.height <= rect2.y || rect2.y + rect2.height <= rect1.y
+  );
+
+  return horizontalOverlap && verticalOverlap;
+}
+
 export function validateInputs(
   wall: WallDimensions,
   shelves: ShelfDimensions[],
@@ -58,6 +74,36 @@ export function validateInputs(
       errors.push(`Obstruction ${index + 1} extends beyond wall height`);
     }
   });
+
+  // Check for obstruction-obstruction conflicts
+  for (let i = 0; i < obstructions.length; i++) {
+    for (let j = i + 1; j < obstructions.length; j++) {
+      if (
+        checkOverlap(
+          {
+            x: obstructions[i].distanceFromLeft,
+            y: obstructions[i].distanceFromFloor,
+            width: obstructions[i].width,
+            height: obstructions[i].height,
+          },
+          {
+            x: obstructions[j].distanceFromLeft,
+            y: obstructions[j].distanceFromFloor,
+            width: obstructions[j].width,
+            height: obstructions[j].height,
+          }
+        )
+      ) {
+        const type1 =
+          obstructions[i].type.charAt(0).toUpperCase() +
+          obstructions[i].type.slice(1);
+        const type2 =
+          obstructions[j].type.charAt(0).toUpperCase() +
+          obstructions[j].type.slice(1);
+        errors.push(`${type1} ${i + 1} overlaps with ${type2} ${j + 1}`);
+      }
+    }
+  }
 
   return errors;
 }
@@ -540,7 +586,8 @@ export function calculateWallItemPlacement(
   obstructions: Obstruction[],
   alignment: Alignment = 'center',
   galleryLayout: GalleryLayout = 'custom',
-  eyeLevelHeight: number = 57
+  eyeLevelHeight: number = 57,
+  autoArrange: boolean = true
 ): CalculationResult {
   if (items.length === 0) {
     return {
@@ -554,11 +601,52 @@ export function calculateWallItemPlacement(
   const placements: ShelfPlacement[] = [];
   const hardwareRecommendations: HardwareRecommendation[] = [];
 
-  // Separate shelves from wall items
-  const shelves = items.filter(
+  // Separate items with manual positions from auto-positioned items
+  const manualItems = items.filter(
+    (item) => item.manualPosition && (item.locked || !autoArrange)
+  );
+  const autoItems = items.filter(
+    (item) => !item.manualPosition || (!item.locked && autoArrange)
+  );
+
+  // First, place manually positioned items
+  manualItems.forEach((item) => {
+    if (item.manualPosition) {
+      const itemHeight = item.height || (item.type === 'shelf' ? 1 : 24);
+      placements.push({
+        id: item.id,
+        type: item.type,
+        distanceFromLeft: item.manualPosition.distanceFromLeft,
+        distanceFromFloor: item.manualPosition.distanceFromFloor,
+        width: item.width,
+        height: itemHeight,
+        depth:
+          item.type === 'shelf' ? (item as ShelfDimensions).depth : undefined,
+        weight:
+          item.weight ||
+          (item.type === 'shelf'
+            ? (item as ShelfDimensions).expectedWeight
+            : undefined),
+        expectedWeight:
+          item.type === 'shelf'
+            ? (item as ShelfDimensions).expectedWeight
+            : undefined,
+        hangingMethod:
+          item.type !== 'shelf' ? (item as WallItem).hangingMethod : undefined,
+        frameDepth:
+          item.type !== 'shelf' ? (item as WallItem).frameDepth : undefined,
+        isFramed:
+          item.type !== 'shelf' ? (item as WallItem).isFramed : undefined,
+        shape: item.type !== 'shelf' ? (item as WallItem).shape : undefined,
+      });
+    }
+  });
+
+  // Separate shelves from wall items in auto items
+  const shelves = autoItems.filter(
     (item): item is ShelfDimensions => item.type === 'shelf'
   );
-  const wallItems = items.filter(
+  const wallItems = autoItems.filter(
     (item): item is WallItem => item.type !== 'shelf'
   );
 
@@ -627,21 +715,34 @@ function applyGalleryLayout(
   eyeLevelHeight: number,
   existingPlacements: ShelfPlacement[]
 ): ShelfPlacement[] {
-  const placements: ShelfPlacement[] = [];
-  const wallMargin = 4;
-
   switch (layout) {
     case 'grid':
-      return applyGridLayout(wall, items, wallMargin, eyeLevelHeight);
+      return applyGridLayout(
+        wall,
+        items,
+        4,
+        eyeLevelHeight,
+        obstructions,
+        existingPlacements
+      );
     case 'salon':
-      return applySalonLayout(wall, items, wallMargin, eyeLevelHeight);
+      return applySalonLayout(
+        wall,
+        items,
+        4,
+        eyeLevelHeight,
+        obstructions,
+        existingPlacements
+      );
     case 'linear':
       return applyLinearLayout(
         wall,
         items,
         alignment,
-        wallMargin,
-        eyeLevelHeight
+        4,
+        eyeLevelHeight,
+        obstructions,
+        existingPlacements
       );
     case 'custom':
     default:
@@ -649,18 +750,22 @@ function applyGalleryLayout(
         wall,
         items,
         alignment,
-        wallMargin,
-        eyeLevelHeight
+        4,
+        eyeLevelHeight,
+        obstructions,
+        existingPlacements
       );
   }
 }
 
-// Grid layout: evenly spaced in rows and columns
+// Grid layout: evenly spaced in rows and columns, centered around eye level
 function applyGridLayout(
   wall: WallDimensions,
   items: WallItem[],
   margin: number,
-  eyeLevelHeight: number
+  eyeLevelHeight: number,
+  obstructions: Obstruction[],
+  existingPlacements: ShelfPlacement[]
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
   const spacing = 6; // spacing between items
@@ -669,28 +774,54 @@ function applyGridLayout(
   const cols = Math.ceil(Math.sqrt(items.length));
   const rows = Math.ceil(items.length / cols);
 
+  // Calculate total height needed for the grid
+  const maxItemHeight = Math.max(...items.map((item) => item.height));
+  const totalGridHeight = rows * maxItemHeight + (rows - 1) * spacing;
+
   // Calculate available space
   const availableWidth = wall.width - 2 * margin;
-  const availableHeight = wall.height - 2 * margin;
+
+  // Center the grid vertically around eye level
+  const gridStartY = eyeLevelHeight - totalGridHeight / 2;
+
+  // Ensure grid stays within bounds
+  const finalStartY = Math.max(
+    margin,
+    Math.min(gridStartY, wall.height - totalGridHeight - margin)
+  );
 
   items.forEach((item, index) => {
     const col = index % cols;
     const row = Math.floor(index / cols);
 
-    const x = margin + (col * availableWidth) / cols + spacing;
-    const y = margin + (row * availableHeight) / rows + spacing;
+    // Horizontal positioning - evenly distributed
+    const cellWidth = availableWidth / cols;
+    const x = margin + col * cellWidth + (cellWidth - item.width) / 2;
+
+    // Vertical positioning - centered around eye level
+    const y =
+      finalStartY +
+      row * (maxItemHeight + spacing) +
+      (maxItemHeight - item.height) / 2;
 
     placements.push({
       id: item.id,
       type: item.type,
-      distanceFromLeft: x,
-      distanceFromFloor: y,
+      distanceFromLeft: Math.max(
+        margin,
+        Math.min(x, wall.width - item.width - margin)
+      ),
+      distanceFromFloor: Math.max(
+        margin,
+        Math.min(y, wall.height - item.height - margin)
+      ),
       width: item.width,
       height: item.height,
       weight: item.weight,
       hangingMethod: item.hangingMethod,
       frameDepth: item.frameDepth,
       isFramed: item.isFramed,
+      shape: item.shape,
     });
   });
 
@@ -702,7 +833,9 @@ function applySalonLayout(
   wall: WallDimensions,
   items: WallItem[],
   margin: number,
-  eyeLevelHeight: number
+  eyeLevelHeight: number,
+  obstructions: Obstruction[],
+  existingPlacements: ShelfPlacement[]
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
 
@@ -725,6 +858,7 @@ function applySalonLayout(
       hangingMethod: centerItem.hangingMethod,
       frameDepth: centerItem.frameDepth,
       isFramed: centerItem.isFramed,
+      shape: centerItem.shape,
     });
 
     // Place remaining items around the center
@@ -756,6 +890,7 @@ function applySalonLayout(
         hangingMethod: item.hangingMethod,
         frameDepth: item.frameDepth,
         isFramed: item.isFramed,
+        shape: item.shape,
       });
     }
   }
@@ -769,7 +904,9 @@ function applyLinearLayout(
   items: WallItem[],
   alignment: Alignment,
   margin: number,
-  eyeLevelHeight: number
+  eyeLevelHeight: number,
+  obstructions: Obstruction[],
+  existingPlacements: ShelfPlacement[]
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
   const spacing = 6;
@@ -786,19 +923,79 @@ function applyLinearLayout(
     startX = wall.width - totalWidth - margin;
   }
 
+  // Check if the linear layout would overlap with existing placements
+  // If so, shift vertically
+  let baseY = eyeLevelHeight;
+  let needsAdjustment = true;
+  let attempts = 0;
+
+  while (needsAdjustment && attempts < 20) {
+    needsAdjustment = false;
+    attempts++;
+
+    let currentX = startX;
+    for (const item of items) {
+      const y = baseY - item.height / 2;
+
+      // Check overlaps with existing placements
+      for (const placement of existingPlacements) {
+        if (
+          checkOverlap(
+            { x: currentX, y, width: item.width, height: item.height },
+            {
+              x: placement.distanceFromLeft,
+              y: placement.distanceFromFloor,
+              width: placement.width,
+              height: placement.height,
+            }
+          )
+        ) {
+          needsAdjustment = true;
+          baseY -= item.height + spacing;
+          break;
+        }
+      }
+
+      if (needsAdjustment) break;
+
+      // Check overlaps with obstructions
+      for (const obstruction of obstructions) {
+        if (
+          checkOverlap(
+            { x: currentX, y, width: item.width, height: item.height },
+            {
+              x: obstruction.distanceFromLeft,
+              y: obstruction.distanceFromFloor,
+              width: obstruction.width,
+              height: obstruction.height,
+            }
+          )
+        ) {
+          needsAdjustment = true;
+          baseY -= item.height + spacing;
+          break;
+        }
+      }
+
+      if (needsAdjustment) break;
+      currentX += item.width + spacing;
+    }
+  }
+
   let currentX = startX;
   items.forEach((item) => {
     placements.push({
       id: item.id,
       type: item.type,
       distanceFromLeft: currentX,
-      distanceFromFloor: eyeLevelHeight - item.height / 2,
+      distanceFromFloor: baseY - item.height / 2,
       width: item.width,
       height: item.height,
       weight: item.weight,
       hangingMethod: item.hangingMethod,
       frameDepth: item.frameDepth,
       isFramed: item.isFramed,
+      shape: item.shape,
     });
     currentX += item.width + spacing;
   });
@@ -806,19 +1003,85 @@ function applyLinearLayout(
   return placements;
 }
 
-// Custom layout: user-defined or default centered placement
+// Custom layout: user-defined or default centered placement with overlap avoidance
 function applyCustomLayout(
   wall: WallDimensions,
   items: WallItem[],
   alignment: Alignment,
   margin: number,
-  eyeLevelHeight: number
+  eyeLevelHeight: number,
+  obstructions: Obstruction[],
+  existingPlacements: ShelfPlacement[]
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
+  const minSpacing = 4; // minimum spacing between items
 
-  items.forEach((item, index) => {
+  // Helper function to check if a position overlaps with anything
+  const hasOverlap = (
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): boolean => {
+    // Check against existing placements (shelves)
+    for (const placement of existingPlacements) {
+      if (
+        checkOverlap(
+          { x, y, width, height },
+          {
+            x: placement.distanceFromLeft,
+            y: placement.distanceFromFloor,
+            width: placement.width,
+            height: placement.height,
+          }
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // Check against already placed items
+    for (const placement of placements) {
+      if (
+        checkOverlap(
+          { x, y, width, height },
+          {
+            x: placement.distanceFromLeft,
+            y: placement.distanceFromFloor,
+            width: placement.width,
+            height: placement.height,
+          }
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // Check against obstructions
+    for (const obstruction of obstructions) {
+      if (
+        checkOverlap(
+          { x, y, width, height },
+          {
+            x: obstruction.distanceFromLeft,
+            y: obstruction.distanceFromFloor,
+            width: obstruction.width,
+            height: obstruction.height,
+          }
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  items.forEach((item) => {
     let x = margin;
+    let y = eyeLevelHeight - item.height / 2;
 
+    // Calculate initial horizontal position based on alignment
     switch (alignment) {
       case 'center':
         x = (wall.width - item.width) / 2;
@@ -832,22 +1095,48 @@ function applyCustomLayout(
         break;
     }
 
-    const y = calculateEyeLevelHeight(wall.height, item.height) + index * 12;
+    // Try to find a non-overlapping position
+    let attempts = 0;
+    const maxAttempts = 50;
+
+    while (
+      hasOverlap(x, y, item.width, item.height) &&
+      attempts < maxAttempts
+    ) {
+      attempts++;
+
+      // Try moving down first
+      y -= item.height + minSpacing;
+
+      // If we're too low, try moving to the right
+      if (y < margin) {
+        y = eyeLevelHeight - item.height / 2;
+        x += item.width + minSpacing;
+
+        // If we're too far right, try left side
+        if (x + item.width > wall.width - margin) {
+          x = margin;
+          y = eyeLevelHeight + item.height + minSpacing;
+        }
+      }
+
+      // Keep within bounds
+      x = Math.max(margin, Math.min(x, wall.width - item.width - margin));
+      y = Math.max(margin, Math.min(y, wall.height - item.height - margin));
+    }
 
     placements.push({
       id: item.id,
       type: item.type,
       distanceFromLeft: x,
-      distanceFromFloor: Math.max(
-        margin,
-        Math.min(y, wall.height - item.height - margin)
-      ),
+      distanceFromFloor: y,
       width: item.width,
       height: item.height,
       weight: item.weight,
       hangingMethod: item.hangingMethod,
       frameDepth: item.frameDepth,
       isFramed: item.isFramed,
+      shape: item.shape,
     });
   });
 
@@ -1041,4 +1330,89 @@ function generateInstallationInstructions(
   );
 
   return instructions;
+}
+
+// Helper function to check for conflicts between placed items and obstructions
+export function checkItemObstructionConflicts(
+  placements: ShelfPlacement[],
+  obstructions: Obstruction[]
+): string[] {
+  const errors: string[] = [];
+
+  obstructions.forEach((obs, obsIndex) => {
+    placements.forEach((placement, placementIndex) => {
+      const itemHeight = placement.height || 1;
+
+      if (
+        checkOverlap(
+          {
+            x: obs.distanceFromLeft,
+            y: obs.distanceFromFloor,
+            width: obs.width,
+            height: obs.height,
+          },
+          {
+            x: placement.distanceFromLeft,
+            y: placement.distanceFromFloor,
+            width: placement.width,
+            height: itemHeight,
+          }
+        )
+      ) {
+        const obsType = obs.type.charAt(0).toUpperCase() + obs.type.slice(1);
+        const itemType =
+          placement.type.charAt(0).toUpperCase() + placement.type.slice(1);
+        errors.push(
+          `${obsType} ${obsIndex + 1} overlaps with ${itemType} ${
+            placementIndex + 1
+          } - please reposition`
+        );
+      }
+    });
+  });
+
+  return errors;
+}
+
+// Helper function to check for conflicts between placed items themselves
+export function checkPlacedItemConflicts(
+  placements: ShelfPlacement[]
+): string[] {
+  const errors: string[] = [];
+
+  for (let i = 0; i < placements.length; i++) {
+    for (let j = i + 1; j < placements.length; j++) {
+      const item1 = placements[i];
+      const item2 = placements[j];
+      const item1Height = item1.height || 1;
+      const item2Height = item2.height || 1;
+
+      if (
+        checkOverlap(
+          {
+            x: item1.distanceFromLeft,
+            y: item1.distanceFromFloor,
+            width: item1.width,
+            height: item1Height,
+          },
+          {
+            x: item2.distanceFromLeft,
+            y: item2.distanceFromFloor,
+            width: item2.width,
+            height: item2Height,
+          }
+        )
+      ) {
+        const type1 = item1.type.charAt(0).toUpperCase() + item1.type.slice(1);
+        const type2 = item2.type.charAt(0).toUpperCase() + item2.type.slice(1);
+        errors.push(
+          `${type1} ${i + 1} overlaps with ${type2} ${
+            j + 1
+          } - please reposition or resize`
+        );
+      }
+    }
+  }
+
+  return errors;
 }
