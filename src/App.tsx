@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   AlertCircle,
   Calculator,
@@ -41,7 +41,6 @@ import {
   importProjectFromJSON,
   SavedProject,
 } from './utils/storage';
-import boltLogo from './assets/black_circle_360x360.png';
 
 function App() {
   const [wall, setWall] = useState<WallDimensions>({ width: 96, height: 96 });
@@ -78,11 +77,40 @@ function App() {
   const [activeTab, setActiveTab] = useState<
     'setup' | 'measurements' | 'materials' | 'guidance'
   >('setup');
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [isSchematicCompact, setIsSchematicCompact] = useState(false);
 
   // Load saved projects on mount
   useEffect(() => {
     setSavedProjects(getAllProjects());
   }, []);
+
+  useEffect(() => {
+    if (result.shelves.length === 0) {
+      setIsSchematicCompact(false);
+    }
+
+    const rootEl = scrollContainerRef.current;
+    const sentinelEl = sentinelRef.current;
+    if (!rootEl || !sentinelEl) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSchematicCompact(!entry.isIntersecting);
+      },
+      {
+        root: rootEl,
+        rootMargin: '-140px 0px 0px 0px',
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinelEl);
+    return () => observer.disconnect();
+  }, [result.shelves.length]);
 
   useEffect(() => {
     // Split items into shelves and wall items for validation
@@ -296,17 +324,6 @@ function App() {
                 <Upload className='h-4 w-4' />
                 <span className='hidden sm:inline'>Import</span>
               </button>
-              <a
-                href='https://bolt.new/'
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <img
-                  src={boltLogo}
-                  alt='Built with bolt.new'
-                  className='h-16 w-16'
-                />
-              </a>
             </div>
           </div>
           {currentProjectName && (
@@ -318,177 +335,193 @@ function App() {
         </div>
       </header>
 
-      <main className='flex flex-col h-[calc(100vh-8rem)]'>
-        {/* Sticky Schematic Section */}
-        {result.shelves.length > 0 && (
-          <div className='bg-white border-b border-gray-200 shadow-md'>
-            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4'>
-              <SchematicDisplay
-                wall={wall}
-                obstructions={obstructions}
-                shelves={result.shelves}
-                unit={settings.unit}
-                wallMaterial={settings.wallMaterial}
-                mountingType={settings.mountingType}
-                useStuds={useStuds}
-                selectedShelfId={hoveredShelfId || selectedShelfId}
-                onHoverShelf={(id) => setHoveredShelfId(id)}
-                studSpacing={settings.studSpacing}
-                customStudLocations={settings.customStudLocations}
-                enableStudDetection={settings.enableStudDetection}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Scrollable Content Section */}
-        <div className='flex-1 overflow-y-auto'>
-          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-            {/* Error Display */}
-            {errors.length > 0 && (
-              <div className='mb-8 bg-red-50 border border-red-200 rounded-xl p-4'>
-                <div className='flex items-start gap-3'>
-                  <AlertCircle className='h-5 w-5 text-red-600 flex-shrink-0 mt-0.5' />
-                  <div className='flex-1'>
-                    <h3 className='font-semibold text-red-900 mb-2'>
-                      Please fix the following issues:
-                    </h3>
-                    <ul className='space-y-1 mb-3'>
-                      {errors.map((error, index) => (
-                        <li key={index} className='text-red-800 text-sm'>
-                          • {error}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className='mt-3 pt-3 border-t border-red-200'>
-                      <p className='text-sm text-red-700 font-medium mb-2'>
-                        💡 How to fix overlaps:
-                      </p>
-                      <ul className='text-xs text-red-700 space-y-1 ml-4'>
-                        <li>
-                          • Use the <strong>Position Controls</strong> below
-                          each item to manually adjust positions
-                        </li>
-                        <li>
-                          • Check the <strong>Wall Schematic</strong> above to
-                          see where items overlap
-                        </li>
-                        <li>
-                          • Click the <strong>lock icon 🔓</strong> to enable
-                          manual positioning for a specific item
-                        </li>
-                        <li>
-                          • Or uncheck <strong>"Auto-arrange items"</strong> in
-                          Project Settings to position all items manually
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tabbed Interface */}
-            <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
-              {/* Tab Headers */}
-              <div className='flex border-b border-gray-200 bg-gray-50'>
-                <button
-                  onClick={() => setActiveTab('setup')}
-                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                    activeTab === 'setup'
-                      ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      <main className='flex flex-col h-[calc(100vh-9rem)]'>
+        <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
+          <div className='min-h-full pb-16'>
+            {result.shelves.length > 0 && (
+              <>
+                <section
+                  className={`sticky top-0 z-30 border-b border-gray-200 transition-all duration-300 ${
+                    isSchematicCompact
+                      ? 'bg-white/95 backdrop-blur-sm py-3'
+                      : 'bg-white py-6'
                   }`}
                 >
-                  <Settings className='h-4 w-4' />
-                  Setup & Configuration
-                </button>
-                <button
-                  onClick={() => setActiveTab('measurements')}
-                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                    activeTab === 'measurements'
-                      ? 'bg-white text-green-600 border-b-2 border-green-600'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                  disabled={result.shelves.length === 0 || errors.length > 0}
-                >
-                  <Ruler className='h-4 w-4' />
-                  Measurements & Instructions
-                </button>
-                <button
-                  onClick={() => setActiveTab('materials')}
-                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                    activeTab === 'materials'
-                      ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                  disabled={result.shelves.length === 0 || errors.length > 0}
-                >
-                  <Hammer className='h-4 w-4' />
-                  Materials & Export
-                </button>
-                <button
-                  onClick={() => setActiveTab('guidance')}
-                  className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                    activeTab === 'guidance'
-                      ? 'bg-white text-purple-600 border-b-2 border-purple-600'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  <BookOpen className='h-4 w-4' />
-                  Tools & Guidance
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              <div className='p-6'>
-                {activeTab === 'setup' && (
-                  <InputSection
-                    wall={wall}
-                    shelves={shelves}
-                    obstructions={obstructions}
-                    settings={settings}
-                    onWallChange={setWall}
-                    onShelvesChange={setShelves}
-                    onObstructionsChange={setObstructions}
-                    onSettingsChange={setSettings}
-                  />
-                )}
-
-                {activeTab === 'measurements' &&
-                  result.shelves.length > 0 &&
-                  errors.length === 0 && (
-                    <MeasurementOutput
-                      result={result}
+                  <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+                    <SchematicDisplay
+                      wall={wall}
+                      obstructions={obstructions}
+                      shelves={result.shelves}
                       unit={settings.unit}
                       wallMaterial={settings.wallMaterial}
                       mountingType={settings.mountingType}
                       useStuds={useStuds}
-                    />
-                  )}
-
-                {activeTab === 'materials' &&
-                  result.shelves.length > 0 &&
-                  errors.length === 0 && (
-                    <MaterialCalculator
-                      placedShelves={result.shelves}
-                      settings={settings}
-                      useStuds={useStuds}
-                      onToggleUseStuds={setUseStuds}
-                      selectedShelfId={selectedShelfId}
-                      onSelectShelf={(id) =>
-                        setSelectedShelfId((prev) => (prev === id ? null : id))
-                      }
+                      selectedShelfId={hoveredShelfId || selectedShelfId}
                       onHoverShelf={(id) => setHoveredShelfId(id)}
+                      studSpacing={settings.studSpacing}
+                      customStudLocations={settings.customStudLocations}
+                      enableStudDetection={settings.enableStudDetection}
+                      isCompact={isSchematicCompact}
+                    />
+                  </div>
+                </section>
+                <div
+                  ref={sentinelRef}
+                  aria-hidden='true'
+                  className='h-px w-full'
+                />
+              </>
+            )}
+
+            <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+              {/* Error Display */}
+              {errors.length > 0 && (
+                <div className='mb-8 bg-red-50 border border-red-200 rounded-xl p-4'>
+                  <div className='flex items-start gap-3'>
+                    <AlertCircle className='h-5 w-5 text-red-600 flex-shrink-0 mt-0.5' />
+                    <div className='flex-1'>
+                      <h3 className='font-semibold text-red-900 mb-2'>
+                        Please fix the following issues:
+                      </h3>
+                      <ul className='space-y-1 mb-3'>
+                        {errors.map((error, index) => (
+                          <li key={index} className='text-red-800 text-sm'>
+                            • {error}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className='mt-3 pt-3 border-t border-red-200'>
+                        <p className='text-sm text-red-700 font-medium mb-2'>
+                          💡 How to fix overlaps:
+                        </p>
+                        <ul className='text-xs text-red-700 space-y-1 ml-4'>
+                          <li>
+                            • Use the <strong>Position Controls</strong> below
+                            each item to manually adjust positions
+                          </li>
+                          <li>
+                            • Check the <strong>Wall Schematic</strong> above to
+                            see where items overlap
+                          </li>
+                          <li>
+                            • Click the <strong>lock icon 🔓</strong> to enable
+                            manual positioning for a specific item
+                          </li>
+                          <li>
+                            • Or uncheck <strong>"Auto-arrange items"</strong>{' '}
+                            in Project Settings to position all items manually
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabbed Interface */}
+              <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
+                {/* Tab Headers */}
+                <div className='flex border-b border-gray-200 bg-gray-50'>
+                  <button
+                    onClick={() => setActiveTab('setup')}
+                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      activeTab === 'setup'
+                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Settings className='h-4 w-4' />
+                    Setup & Configuration
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('measurements')}
+                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      activeTab === 'measurements'
+                        ? 'bg-white text-green-600 border-b-2 border-green-600'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                    disabled={result.shelves.length === 0 || errors.length > 0}
+                  >
+                    <Ruler className='h-4 w-4' />
+                    Measurements & Instructions
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('materials')}
+                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      activeTab === 'materials'
+                        ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                    disabled={result.shelves.length === 0 || errors.length > 0}
+                  >
+                    <Hammer className='h-4 w-4' />
+                    Materials & Export
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('guidance')}
+                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      activeTab === 'guidance'
+                        ? 'bg-white text-purple-600 border-b-2 border-purple-600'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    <BookOpen className='h-4 w-4' />
+                    Tools & Guidance
+                  </button>
+                </div>
+
+                {/* Tab Content */}
+                <div className='p-4'>
+                  {activeTab === 'setup' && (
+                    <InputSection
                       wall={wall}
+                      shelves={shelves}
                       obstructions={obstructions}
-                      result={result}
+                      settings={settings}
+                      onWallChange={setWall}
+                      onShelvesChange={setShelves}
+                      onObstructionsChange={setObstructions}
+                      onSettingsChange={setSettings}
                     />
                   )}
 
-                {activeTab === 'guidance' && (
-                  <ToolsAndGuidance settings={settings} />
-                )}
+                  {activeTab === 'measurements' &&
+                    result.shelves.length > 0 &&
+                    errors.length === 0 && (
+                      <MeasurementOutput
+                        result={result}
+                        unit={settings.unit}
+                        wallMaterial={settings.wallMaterial}
+                        mountingType={settings.mountingType}
+                        useStuds={useStuds}
+                      />
+                    )}
+
+                  {activeTab === 'materials' &&
+                    result.shelves.length > 0 &&
+                    errors.length === 0 && (
+                      <MaterialCalculator
+                        placedShelves={result.shelves}
+                        settings={settings}
+                        useStuds={useStuds}
+                        onToggleUseStuds={setUseStuds}
+                        selectedShelfId={selectedShelfId}
+                        onSelectShelf={(id) =>
+                          setSelectedShelfId((prev) =>
+                            prev === id ? null : id
+                          )
+                        }
+                        onHoverShelf={(id) => setHoveredShelfId(id)}
+                        wall={wall}
+                        obstructions={obstructions}
+                        result={result}
+                      />
+                    )}
+
+                  {activeTab === 'guidance' && (
+                    <ToolsAndGuidance settings={settings} />
+                  )}
+                </div>
               </div>
             </div>
           </div>

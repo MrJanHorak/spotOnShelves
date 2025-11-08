@@ -26,6 +26,7 @@ interface SchematicDisplayProps {
   studSpacing?: number;
   customStudLocations?: number[];
   enableStudDetection?: boolean;
+  isCompact?: boolean;
 }
 
 export function SchematicDisplay({
@@ -41,6 +42,7 @@ export function SchematicDisplay({
   studSpacing = 16,
   customStudLocations,
   enableStudDetection = false,
+  isCompact = false,
 }: SchematicDisplayProps) {
   // Display options state
   const [showStuds, setShowStuds] = useState(true);
@@ -62,8 +64,16 @@ export function SchematicDisplay({
     }, 120);
   }
   // Calculate scale to fit within container
-  const containerWidth = 700;
-  const containerHeight = 350;
+  const showSidebar = !isCompact;
+  const baseWidth = 700;
+  const baseHeight = 350;
+  const compactScale = 0.3; // how much smaller the preview becomes
+  const containerWidth = Math.round(
+    isCompact ? baseWidth * compactScale : baseWidth
+  );
+  const containerHeight = Math.round(
+    isCompact ? baseHeight * compactScale : baseHeight
+  );
   const scale =
     Math.min(
       containerWidth / Math.max(wall.width, 1),
@@ -95,16 +105,38 @@ export function SchematicDisplay({
     : [];
 
   return (
-    <div className='bg-white rounded-xl shadow-lg p-6'>
-      <h2 className='text-2xl font-bold text-gray-900 mb-6'>Wall Schematic</h2>
+    <div
+      className={`bg-white rounded-xl shadow-lg transition-all duration-300 ${
+        isCompact ? 'p-4' : 'p-6'
+      }`}
+      style={{
+        transformOrigin: 'top center',
+        boxShadow: isCompact
+          ? '0 12px 24px -12px rgba(15, 23, 42, 0.35)'
+          : undefined,
+      }}
+    >
+      {showSidebar && (
+        <h2 className='text-2xl font-bold text-gray-900 mb-6'>
+          Wall Schematic
+        </h2>
+      )}
 
-      <div className='flex flex-col lg:flex-row gap-6'>
+      <div
+        className={`flex flex-col ${
+          showSidebar ? 'lg:flex-row gap-6' : 'items-center'
+        }`}
+      >
         {/* SVG Schematic */}
         <div className='flex-1'>
           <div
             id='schematic-container'
             className='border border-gray-300 rounded-lg bg-gray-50 mx-auto'
-            style={{ width: containerWidth, height: containerHeight }}
+            style={{
+              width: containerWidth,
+              height: containerHeight,
+              transition: 'width 240ms ease, height 240ms ease',
+            }}
           >
             <svg
               id='schematic-svg'
@@ -621,92 +653,96 @@ export function SchematicDisplay({
         </div>
 
         {/* Legend */}
-        <div className='w-full lg:w-64 space-y-4'>
-          <div>
-            <h3 className='font-semibold text-gray-900 mb-2'>Legend</h3>
-            <div className='space-y-2 text-sm'>
-              <div className='flex items-center gap-2'>
-                <div className='w-4 h-4 bg-gray-100 border-2 border-gray-600 rounded'></div>
-                <span>Wall</span>
-              </div>
-              <div className='flex items-center gap-2'>
-                <div className='w-4 h-4 bg-green-600 rounded'></div>
-                <span>Shelves</span>
-              </div>
-              {enableStudDetection && studLocations.length > 0 && (
+        {showSidebar && (
+          <div className='w-full lg:w-64 space-y-4'>
+            <div>
+              <h3 className='font-semibold text-gray-900 mb-2'>Legend</h3>
+              <div className='space-y-2 text-sm'>
                 <div className='flex items-center gap-2'>
-                  <div className='w-4 h-4 bg-yellow-300 border border-yellow-600 rounded'></div>
-                  <span>Studs ({studLocations.length})</span>
+                  <div className='w-4 h-4 bg-gray-100 border-2 border-gray-600 rounded'></div>
+                  <span>Wall</span>
                 </div>
-              )}
-              <div className='flex items-center gap-2'>
-                <div className='w-4 h-4 bg-indigo-500 rounded'></div>
-                <span>Bracket Spacing</span>
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-green-600 rounded'></div>
+                  <span>Shelves</span>
+                </div>
+                {enableStudDetection && studLocations.length > 0 && (
+                  <div className='flex items-center gap-2'>
+                    <div className='w-4 h-4 bg-yellow-300 border border-yellow-600 rounded'></div>
+                    <span>Studs ({studLocations.length})</span>
+                  </div>
+                )}
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-indigo-500 rounded'></div>
+                  <span>Bracket Spacing</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Display Options */}
-          <div>
-            <h4 className='font-medium text-gray-900 mb-3'>Display Options</h4>
-            <div className='space-y-2'>
-              {enableStudDetection && studLocations.length > 0 && (
+            {/* Display Options */}
+            <div>
+              <h4 className='font-medium text-gray-900 mb-3'>
+                Display Options
+              </h4>
+              <div className='space-y-2'>
+                {enableStudDetection && studLocations.length > 0 && (
+                  <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                    <input
+                      type='checkbox'
+                      checked={showStuds}
+                      onChange={(e) => setShowStuds(e.target.checked)}
+                      className='rounded border-gray-300 text-green-600 focus:ring-green-500'
+                    />
+                    <span>Show stud locations</span>
+                  </label>
+                )}
                 <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
                   <input
                     type='checkbox'
-                    checked={showStuds}
-                    onChange={(e) => setShowStuds(e.target.checked)}
+                    checked={showBracketDetails}
+                    onChange={(e) => setShowBracketDetails(e.target.checked)}
                     className='rounded border-gray-300 text-green-600 focus:ring-green-500'
                   />
-                  <span>Show stud locations</span>
+                  <span>Show bracket measurements</span>
                 </label>
-              )}
-              <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
-                <input
-                  type='checkbox'
-                  checked={showBracketDetails}
-                  onChange={(e) => setShowBracketDetails(e.target.checked)}
-                  className='rounded border-gray-300 text-green-600 focus:ring-green-500'
-                />
-                <span>Show bracket measurements</span>
-              </label>
-              <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
-                <input
-                  type='checkbox'
-                  checked={showSpacing}
-                  onChange={(e) => setShowSpacing(e.target.checked)}
-                  className='rounded border-gray-300 text-green-600 focus:ring-green-500'
-                />
-                <span>Show bracket spacing</span>
-              </label>
-            </div>
-          </div>
-
-          {obstructions.length > 0 && (
-            <div>
-              <h4 className='font-medium text-gray-900 mb-2'>Obstructions</h4>
-              <div className='space-y-1 text-sm'>
-                {Array.from(new Set(obstructions.map((o) => o.type))).map(
-                  (type) => (
-                    <div key={type} className='flex items-center gap-2'>
-                      <div
-                        className='w-4 h-4 rounded opacity-60'
-                        style={{ backgroundColor: getObstructionColor(type) }}
-                      ></div>
-                      <span className='capitalize'>{type}</span>
-                    </div>
-                  )
-                )}
+                <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                  <input
+                    type='checkbox'
+                    checked={showSpacing}
+                    onChange={(e) => setShowSpacing(e.target.checked)}
+                    className='rounded border-gray-300 text-green-600 focus:ring-green-500'
+                  />
+                  <span>Show bracket spacing</span>
+                </label>
               </div>
             </div>
-          )}
 
-          <div className='text-xs text-gray-500 bg-gray-50 p-2 rounded'>
-            <strong>Scale:</strong> This diagram is proportionally scaled to
-            show relative positions. Use the measurements panel for exact
-            dimensions.
+            {obstructions.length > 0 && (
+              <div>
+                <h4 className='font-medium text-gray-900 mb-2'>Obstructions</h4>
+                <div className='space-y-1 text-sm'>
+                  {Array.from(new Set(obstructions.map((o) => o.type))).map(
+                    (type) => (
+                      <div key={type} className='flex items-center gap-2'>
+                        <div
+                          className='w-4 h-4 rounded opacity-60'
+                          style={{ backgroundColor: getObstructionColor(type) }}
+                        ></div>
+                        <span className='capitalize'>{type}</span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className='text-xs text-gray-500 bg-gray-50 p-2 rounded'>
+              <strong>Scale:</strong> This diagram is proportionally scaled to
+              show relative positions. Use the measurements panel for exact
+              dimensions.
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
