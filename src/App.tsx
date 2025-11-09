@@ -46,7 +46,6 @@ function App() {
   const [wall, setWall] = useState<WallDimensions>({ width: 96, height: 96 });
   const [shelves, setShelves] = useState<(ShelfDimensions | WallItem)[]>([
     { id: 'shelf-1', type: 'shelf', width: 36, height: 1, depth: 8 },
-    { id: 'shelf-2', type: 'shelf', width: 24, height: 1, depth: 6 },
   ]);
   const [obstructions, setObstructions] = useState<Obstruction[]>([]);
   const [settings, setSettings] = useState<ProjectSettings>({
@@ -103,8 +102,8 @@ function App() {
       },
       {
         root: rootEl,
-        rootMargin: '-140px 0px 0px 0px',
-        threshold: 0,
+        rootMargin: '-135px 0px 0px 0px',
+        threshold: 0.75,
       }
     );
 
@@ -421,7 +420,11 @@ function App() {
               {/* Tabbed Interface */}
               <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
                 {/* Tab Headers */}
-                <div className='flex border-b border-gray-200 bg-gray-50'>
+                <div
+                  className={`flex border-b border-gray-200 bg-gray-50 ${
+                    isSchematicCompact ? 'mt-6=-2px':''
+                  }`}
+                >
                   <button
                     onClick={() => setActiveTab('setup')}
                     className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
