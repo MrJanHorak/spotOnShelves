@@ -119,34 +119,36 @@ export function SchematicDisplay({
     isCompact ? baseHeight * compactScale : baseHeight
   );
 
-  // Scale factor for alignment positions when container is resized (compact mode)
-  const containerScale = isCompact ? compactScale : 1;
-
-  // When using background photo, we want to position the wall SVG over the image
-  // Calculate wall schematic dimensions based on wall measurements and scale factor
-  const wallScale =
-    (useBackgroundPhoto ? wallScaleFactor : null) ??
-    Math.min(
+  // Calculate wall scale: when using background photo, respect wallScaleFactor
+  // Otherwise, auto-fit the wall to the container
+  const autoFitScale =
+    (Math.min(
       containerWidth / Math.max(wall.width, 1),
       containerHeight / Math.max(wall.height, 1)
-    ) * 0.9;
+    ) *
+      0.9) /
+    (isCompact ? compactScale : 1);
 
+  const wallScale = useBackgroundPhoto ? wallScaleFactor : autoFitScale;
+
+  // Wall dimensions in pixels (at base scale, before compact scaling)
   const scaledWidth = wall.width * wallScale;
   const scaledHeight = wall.height * wallScale;
 
-  // Position the wall rectangle based on alignment offsets (when using bg photo)
-  // or center it (when not using bg photo)
-  // Scale the alignment positions when in compact mode
-  const offsetX = useBackgroundPhoto
-    ? (wallAlignmentX ?? baseWidth - wall.width * (wallScaleFactor ?? 1)) *
-      containerScale
-    : (containerWidth - scaledWidth) / 2;
-  const offsetY = useBackgroundPhoto
-    ? (wallAlignmentY ?? baseHeight - wall.height * (wallScaleFactor ?? 1)) *
-      containerScale
-    : (containerHeight - scaledHeight) / 2;
+  // Default centered position (in base container coordinates)
+  const defaultX = (baseWidth - scaledWidth) / 2;
+  const defaultY = (baseHeight - scaledHeight) / 2;
 
-  const scale = wallScale; // for compatibility with existing item rendering code
+  // Wall position: use saved alignment if using background photo, otherwise center
+  const wallX = useBackgroundPhoto ? wallAlignmentX ?? defaultX : defaultX;
+  const wallY = useBackgroundPhoto ? wallAlignmentY ?? defaultY : defaultY;
+
+  // Apply compact scaling to positions for rendering
+  const offsetX = wallX * (isCompact ? compactScale : 1);
+  const offsetY = wallY * (isCompact ? compactScale : 1);
+
+  // The scale for rendering items includes compact scaling
+  const scale = wallScale * (isCompact ? compactScale : 1);
 
   // Handle drag to reposition wall
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -157,8 +159,13 @@ export function SchematicDisplay({
     const rect = containerRef.current.getBoundingClientRect();
     const containerX = e.clientX - rect.left;
     const containerY = e.clientY - rect.top;
+
+    // Convert to base coordinates (undo compact scaling)
+    const baseX = containerX / (isCompact ? compactScale : 1);
+    const baseY = containerY / (isCompact ? compactScale : 1);
+
     // Store the offset between pointer and wall position
-    setDragStart({ x: containerX - offsetX, y: containerY - offsetY });
+    setDragStart({ x: baseX - wallX, y: baseY - wallY });
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
 
@@ -167,14 +174,16 @@ export function SchematicDisplay({
     const rect = containerRef.current.getBoundingClientRect();
     const containerX = e.clientX - rect.left;
     const containerY = e.clientY - rect.top;
-    const newX = containerX - dragStart.x;
-    const newY = containerY - dragStart.y;
-    // Save positions relative to base container size (not scaled)
-    onWallAlignmentChange(
-      newX / containerScale,
-      newY / containerScale,
-      wallScaleFactor
-    );
+
+    // Convert to base coordinates
+    const baseX = containerX / (isCompact ? compactScale : 1);
+    const baseY = containerY / (isCompact ? compactScale : 1);
+
+    const newX = baseX - dragStart.x;
+    const newY = baseY - dragStart.y;
+
+    // Save positions in base coordinates (not scaled)
+    onWallAlignmentChange(newX, newY, wallScaleFactor);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -193,10 +202,10 @@ export function SchematicDisplay({
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.95 : 1.05;
     const newScale = Math.max(0.1, Math.min(5, wallScaleFactor * delta));
-    // Keep current position (already in base coordinates)
+    // Keep position in base coordinates
     onWallAlignmentChange(
-      wallAlignmentX ?? (baseWidth - wall.width * wallScaleFactor) / 2,
-      wallAlignmentY ?? (baseHeight - wall.height * wallScaleFactor) / 2,
+      wallAlignmentX ?? defaultX,
+      wallAlignmentY ?? defaultY,
       newScale
     );
   };
@@ -311,8 +320,8 @@ export function SchematicDisplay({
                 <rect
                   x={offsetX}
                   y={offsetY}
-                  width={scaledWidth}
-                  height={scaledHeight}
+                  width={scaledWidth * (isCompact ? compactScale : 1)}
+                  height={scaledHeight * (isCompact ? compactScale : 1)}
                   fill='none'
                   stroke='#374151'
                   strokeWidth='2'
@@ -325,8 +334,8 @@ export function SchematicDisplay({
                 <rect
                   x={offsetX}
                   y={offsetY}
-                  width={scaledWidth}
-                  height={scaledHeight}
+                  width={scaledWidth * (isCompact ? compactScale : 1)}
+                  height={scaledHeight * (isCompact ? compactScale : 1)}
                   fill='url(#grid)'
                   opacity='0.12'
                   pointerEvents='none'
@@ -836,9 +845,7 @@ export function SchematicDisplay({
               <button
                 onClick={() => {
                   // Reset to centered position in base container coordinates
-                  const resetX = (baseWidth - wall.width * 1) / 2;
-                  const resetY = (baseHeight - wall.height * 1) / 2;
-                  onWallAlignmentChange(resetX, resetY, 1);
+                  onWallAlignmentChange(defaultX, defaultY, 1);
                 }}
                 className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors whitespace-nowrap'
               >
