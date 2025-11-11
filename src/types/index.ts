@@ -114,6 +114,27 @@ export interface ProjectSettings {
   snapToGrid?: boolean; // snap items to grid for alignment
   gridSize?: number; // grid size in inches (default 1)
   minSpacing?: number; // minimum spacing between items in inches
+  // Optional background/photo used behind the wall schematic.
+  // Stored as a data URL (compressed) for project persistence.
+  backgroundImage?: string;
+  // Opacity to render the background image (0 = invisible, 1 = fully opaque)
+  backgroundOpacity?: number;
+  // Whether to use the uploaded photo as the schematic background. If
+  // false the schematic will use the plain generated background.
+  useBackgroundPhoto?: boolean;
+  // How the background image should be sized relative to the schematic
+  // - 'cover' behaves like CSS object-fit: cover and fills the container
+  // - 'contain' fits the image wholly inside the container
+  // - 'fit-to-wall' scales and crops the image so that the image width
+  //    maps to the wall width (useful when the photo is taken front-on)
+  backgroundFitMode?: 'cover' | 'contain' | 'fit-to-wall';
+  // Manual scaling multiplier for background image when finer control is
+  // needed (1 = natural image pixels, values >1 zoom in, <1 zoom out).
+  backgroundScale?: number;
+  // Wall alignment: position of the wall SVG schematic over the background image
+  wallAlignmentX?: number; // X offset in pixels
+  wallAlignmentY?: number; // Y offset in pixels
+  wallScaleFactor?: number; // Scale multiplier for the wall schematic (1 = default)
 }
 
 export interface HardwareRecommendation {

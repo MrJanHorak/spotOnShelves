@@ -1,4 +1,4 @@
-import { useState } from 'react';
+// react hooks imported below
 import {
   WallDimensions,
   Obstruction,
@@ -12,6 +12,7 @@ import {
   calculateMaterials,
   calculateStudLocations,
 } from '../utils/calculations';
+import { useEffect, useRef, useState } from 'react';
 
 interface SchematicDisplayProps {
   wall: WallDimensions;
@@ -27,6 +28,13 @@ interface SchematicDisplayProps {
   customStudLocations?: number[];
   enableStudDetection?: boolean;
   isCompact?: boolean;
+  backgroundImage?: string | null;
+  backgroundOpacity?: number;
+  useBackgroundPhoto?: boolean;
+  wallAlignmentX?: number;
+  wallAlignmentY?: number;
+  wallScaleFactor?: number;
+  onWallAlignmentChange?: (x: number, y: number, scale: number) => void;
 }
 
 export function SchematicDisplay({
@@ -43,7 +51,43 @@ export function SchematicDisplay({
   customStudLocations,
   enableStudDetection = false,
   isCompact = false,
+  backgroundImage = null,
+  backgroundOpacity = 0.6,
+  useBackgroundPhoto = false,
+  wallAlignmentX = 0,
+  wallAlignmentY = 0,
+  wallScaleFactor = 1,
+  onWallAlignmentChange,
 }: SchematicDisplayProps) {
+  // Wall dragging state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Alignment handles state (created after layout calculations)
+  // (alignment handles removed — feature disabled per user request)
+
+  // toLocalX removed (alignment handles disabled)
+
+  // Note: pointer handling is implemented using Pointer Events below. We
+  // attach a single pointermove/pointerup listener to the window and use
+  // pointer capture on the handle element to keep events scoped to the drag.
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const imgNaturalRef = useRef<{ width: number; height: number } | null>(null);
+
+  // Preload image to get natural size for fit-to-wall calculations
+  useEffect(() => {
+    if (!backgroundImage) return;
+    const img = new Image();
+    img.onload = () => {
+      imgNaturalRef.current = {
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      };
+      // If we have a ref'd img element, update its src to ensure natural sizes
+      if (imgRef.current) imgRef.current.src = backgroundImage;
+    };
+    img.src = backgroundImage;
+  }, [backgroundImage]);
   // Display options state
   const [showStuds, setShowStuds] = useState(true);
   const [showBracketDetails, setShowBracketDetails] = useState(false);
@@ -63,27 +107,99 @@ export function SchematicDisplay({
       }
     }, 120);
   }
-  // Calculate scale to fit within container
+  // Calculate container and wall dimensions
   const showSidebar = !isCompact;
   const baseWidth = 700;
   const baseHeight = 350;
-  const compactScale = 0.3; // how much smaller the preview becomes
+  const compactScale = 0.3;
   const containerWidth = Math.round(
     isCompact ? baseWidth * compactScale : baseWidth
   );
   const containerHeight = Math.round(
     isCompact ? baseHeight * compactScale : baseHeight
   );
-  const scale =
+
+  // Scale factor for alignment positions when container is resized (compact mode)
+  const containerScale = isCompact ? compactScale : 1;
+
+  // When using background photo, we want to position the wall SVG over the image
+  // Calculate wall schematic dimensions based on wall measurements and scale factor
+  const wallScale =
+    (useBackgroundPhoto ? wallScaleFactor : null) ??
     Math.min(
       containerWidth / Math.max(wall.width, 1),
       containerHeight / Math.max(wall.height, 1)
-    ) * 0.9; // 90% to leave some margin
+    ) * 0.9;
 
-  const scaledWidth = wall.width * scale;
-  const scaledHeight = wall.height * scale;
-  const offsetX = (containerWidth - scaledWidth) / 2;
-  const offsetY = (containerHeight - scaledHeight) / 2;
+  const scaledWidth = wall.width * wallScale;
+  const scaledHeight = wall.height * wallScale;
+
+  // Position the wall rectangle based on alignment offsets (when using bg photo)
+  // or center it (when not using bg photo)
+  // Scale the alignment positions when in compact mode
+  const offsetX = useBackgroundPhoto
+    ? (wallAlignmentX ?? baseWidth - wall.width * (wallScaleFactor ?? 1)) *
+      containerScale
+    : (containerWidth - scaledWidth) / 2;
+  const offsetY = useBackgroundPhoto
+    ? (wallAlignmentY ?? baseHeight - wall.height * (wallScaleFactor ?? 1)) *
+      containerScale
+    : (containerHeight - scaledHeight) / 2;
+
+  const scale = wallScale; // for compatibility with existing item rendering code
+
+  // Handle drag to reposition wall
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!useBackgroundPhoto || !onWallAlignmentChange || !containerRef.current)
+      return;
+    setIsDragging(true);
+    // Convert pointer position to container-relative coordinates
+    const rect = containerRef.current.getBoundingClientRect();
+    const containerX = e.clientX - rect.left;
+    const containerY = e.clientY - rect.top;
+    // Store the offset between pointer and wall position
+    setDragStart({ x: containerX - offsetX, y: containerY - offsetY });
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || !onWallAlignmentChange || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const containerX = e.clientX - rect.left;
+    const containerY = e.clientY - rect.top;
+    const newX = containerX - dragStart.x;
+    const newY = containerY - dragStart.y;
+    // Save positions relative to base container size (not scaled)
+    onWallAlignmentChange(
+      newX / containerScale,
+      newY / containerScale,
+      wallScaleFactor
+    );
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Handle wheel to scale wall
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!useBackgroundPhoto || !onWallAlignmentChange) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.95 : 1.05;
+    const newScale = Math.max(0.1, Math.min(5, wallScaleFactor * delta));
+    // Keep current position (already in base coordinates)
+    onWallAlignmentChange(
+      wallAlignmentX ?? (baseWidth - wall.width * wallScaleFactor) / 2,
+      wallAlignmentY ?? (baseHeight - wall.height * wallScaleFactor) / 2,
+      newScale
+    );
+  };
 
   const getObstructionColor = (type: string) => {
     const colors = {
@@ -103,6 +219,12 @@ export function SchematicDisplay({
       ? customStudLocations
       : calculateStudLocations(wall.width, studSpacing, studSpacing)
     : [];
+
+  // --- Alignment handles: create and pointer handlers after layout computed ---
+  // Initialize handles around the wall width if not set
+  // alignment handle logic removed
+
+  // alignment handle logic removed
 
   return (
     <div
@@ -130,500 +252,558 @@ export function SchematicDisplay({
         {/* SVG Schematic */}
         <div className='flex-1'>
           <div
+            ref={containerRef}
             id='schematic-container'
-            className='border border-gray-300 rounded-lg bg-gray-50 mx-auto'
+            className='border border-gray-300 rounded-lg bg-gray-50 mx-auto relative'
             style={{
               width: containerWidth,
               height: containerHeight,
               transition: 'width 240ms ease, height 240ms ease',
+              overflow: 'hidden',
             }}
+            onWheel={handleWheel}
           >
+            {/* Background photo - full size, positioned absolutely */}
+            {useBackgroundPhoto && backgroundImage && (
+              <img
+                src={backgroundImage}
+                alt='Wall background'
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  opacity: backgroundOpacity,
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+
+            {/* alignment handles removed per user request */}
+
             <svg
               id='schematic-svg'
               width={containerWidth}
               height={containerHeight}
-              className='overflow-visible'
+              className='overflow-visible relative z-10'
             >
               <style>{`
                 .bracket-marker { opacity: 0; transform: translateY(6px); }
                 .bracket-marker.marker-mounted { opacity: 1; transform: translateY(0); transition: opacity 320ms ease, transform 320ms cubic-bezier(.2,.9,.28,1); }
                 .bracket-marker:hover line, .bracket-marker:hover circle { transform: scale(1.05); }
               `}</style>
-              {/* Wall Background */}
-              <rect
-                x={offsetX}
-                y={offsetY}
-                width={scaledWidth}
-                height={scaledHeight}
-                fill='#F9FAFB'
-                stroke='#374151'
-                strokeWidth='2'
-                rx='4'
-              />
-
-              {/* Stud Indicators */}
-              {showStuds &&
-                studLocations.map((studPos, index) => {
-                  const x = offsetX + studPos * scale;
-                  return (
-                    <g key={`stud-${index}`}>
-                      <line
-                        x1={x}
-                        y1={offsetY}
-                        x2={x}
-                        y2={offsetY + scaledHeight}
-                        stroke='#D1D5DB'
-                        strokeWidth='1.5'
-                        strokeDasharray='6,4'
-                        opacity='0.5'
-                      />
-                      <circle
-                        cx={x}
-                        cy={offsetY - 12}
-                        r='6'
-                        fill='#F3F4F6'
-                        stroke='#9CA3AF'
-                        strokeWidth='1'
-                      />
-                      <text
-                        x={x}
-                        y={offsetY - 12}
-                        textAnchor='middle'
-                        dominantBaseline='middle'
-                        className='text-xs font-medium'
-                        fill='#6B7280'
-                        fontSize='8'
-                      >
-                        S
-                      </text>
-                    </g>
-                  );
-                })}
-
-              {/* Wall Dimensions */}
-              <text
-                x={offsetX + scaledWidth / 2}
-                y={offsetY - 10}
-                textAnchor='middle'
-                className='text-sm font-medium'
-                fill='#374151'
+              {/* Draggable wall group - only interactive when background photo is active */}
+              <g
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                style={{
+                  cursor: useBackgroundPhoto
+                    ? isDragging
+                      ? 'grabbing'
+                      : 'grab'
+                    : 'default',
+                }}
               >
-                {formatMeasurement(wall.width, unit)}
-              </text>
-              <text
-                x={offsetX - 10}
-                y={offsetY + scaledHeight / 2}
-                textAnchor='middle'
-                className='text-sm font-medium'
-                fill='#374151'
-                transform={`rotate(-90 ${offsetX - 10} ${
-                  offsetY + scaledHeight / 2
-                })`}
-              >
-                {formatMeasurement(wall.height, unit)}
-              </text>
+                {/* Wall Background */}
+                <rect
+                  x={offsetX}
+                  y={offsetY}
+                  width={scaledWidth}
+                  height={scaledHeight}
+                  fill='none'
+                  stroke='#374151'
+                  strokeWidth='2'
+                  strokeDasharray={useBackgroundPhoto ? '8,4' : 'none'}
+                  rx='4'
+                />
 
-              {/* Obstructions */}
-              {obstructions.map((obstruction) => (
-                <g key={obstruction.id}>
-                  <rect
-                    x={offsetX + obstruction.distanceFromLeft * scale}
-                    y={
-                      offsetY +
-                      (wall.height -
-                        obstruction.distanceFromFloor -
-                        obstruction.height) *
-                        scale
-                    }
-                    width={obstruction.width * scale}
-                    height={obstruction.height * scale}
-                    fill={getObstructionColor(obstruction.type)}
-                    fillOpacity='0.3'
-                    stroke={getObstructionColor(obstruction.type)}
-                    strokeWidth='2'
-                    rx='2'
-                  />
-                  <text
-                    x={
-                      offsetX +
-                      (obstruction.distanceFromLeft + obstruction.width / 2) *
-                        scale
-                    }
-                    y={
-                      offsetY +
-                      (wall.height -
-                        obstruction.distanceFromFloor -
-                        obstruction.height / 2) *
-                        scale
-                    }
-                    textAnchor='middle'
-                    className='text-xs font-medium'
-                    fill={getObstructionColor(obstruction.type)}
-                    dominantBaseline='middle'
-                  >
-                    {obstruction.type.toUpperCase()}
-                  </text>
-                </g>
-              ))}
+                {/* Grid overlay inside the wall — placed behind items so the
+                  image shows through and items render on top */}
+                <rect
+                  x={offsetX}
+                  y={offsetY}
+                  width={scaledWidth}
+                  height={scaledHeight}
+                  fill='url(#grid)'
+                  opacity='0.12'
+                  pointerEvents='none'
+                />
 
-              {/* Items (Shelves and Wall Items) */}
-              {shelves.map((item, index) => {
-                // Calculate capacity for shelves to show on schematic
-                const itemMaterials =
-                  item.type === 'shelf'
-                    ? calculateMaterials(
-                        [item],
-                        (wallMaterial as WallMaterial) || 'drywall',
-                        (mountingType as MountingType) || 'floating',
-                        { useStuds }
-                      )
-                    : null;
-                const itemCapacity =
-                  itemMaterials?.perShelf?.[0]?.maxWeightCapacity;
+                {/* Stud Indicators */}
+                {showStuds &&
+                  studLocations.map((studPos, index) => {
+                    const x = offsetX + studPos * scale;
+                    return (
+                      <g key={`stud-${index}`}>
+                        <line
+                          x1={x}
+                          y1={offsetY}
+                          x2={x}
+                          y2={offsetY + scaledHeight}
+                          stroke='#D1D5DB'
+                          strokeWidth='1.5'
+                          strokeDasharray='6,4'
+                          opacity='0.5'
+                        />
+                        <circle
+                          cx={x}
+                          cy={offsetY - 12}
+                          r='6'
+                          fill='#F3F4F6'
+                          stroke='#9CA3AF'
+                          strokeWidth='1'
+                        />
+                        <text
+                          x={x}
+                          y={offsetY - 12}
+                          textAnchor='middle'
+                          dominantBaseline='middle'
+                          className='text-xs font-medium'
+                          fill='#6B7280'
+                          fontSize='8'
+                        >
+                          S
+                        </text>
+                      </g>
+                    );
+                  })}
 
-                // Determine item color and style based on type
-                const getItemColor = () => {
-                  switch (item.type) {
-                    case 'shelf':
-                      return { fill: '#059669', stroke: '#047857' };
-                    case 'picture':
-                      return { fill: '#8B5CF6', stroke: '#7C3AED' };
-                    case 'poster':
-                      return { fill: '#EC4899', stroke: '#DB2777' };
-                    case 'mirror':
-                      return { fill: '#06B6D4', stroke: '#0891B2' };
-                    case 'tv':
-                      return { fill: '#EF4444', stroke: '#DC2626' };
-                    case 'artpiece':
-                      return { fill: '#F59E0B', stroke: '#D97706' };
-                    default:
-                      return { fill: '#6B7280', stroke: '#4B5563' };
-                  }
-                };
+                {/* Wall Dimensions */}
+                <text
+                  x={offsetX + scaledWidth / 2}
+                  y={offsetY - 10}
+                  textAnchor='middle'
+                  className='text-sm font-medium'
+                  fill='#374151'
+                >
+                  {formatMeasurement(wall.width, unit)}
+                </text>
+                <text
+                  x={offsetX - 10}
+                  y={offsetY + scaledHeight / 2}
+                  textAnchor='middle'
+                  className='text-sm font-medium'
+                  fill='#374151'
+                  transform={`rotate(-90 ${offsetX - 10} ${
+                    offsetY + scaledHeight / 2
+                  })`}
+                >
+                  {formatMeasurement(wall.height, unit)}
+                </text>
 
-                const colors = getItemColor();
-                const itemHeight = item.height || 1;
-                const itemX = offsetX + item.distanceFromLeft * scale;
-                const itemY =
-                  offsetY +
-                  (wall.height - item.distanceFromFloor - itemHeight) * scale;
-                const itemWidth = item.width * scale;
-                const itemHeightScaled = itemHeight * scale;
-
-                // Determine if item is circular/oval based on shape
-                const isCircular =
-                  item.type === 'mirror' &&
-                  (item.shape === 'circle' || item.shape === 'oval');
-
-                return (
-                  <g key={item.id}>
-                    {isCircular ? (
-                      // Render ellipse for circle/oval mirrors
-                      <ellipse
-                        cx={itemX + itemWidth / 2}
-                        cy={itemY + itemHeightScaled / 2}
-                        rx={itemWidth / 2}
-                        ry={itemHeightScaled / 2}
-                        fill={colors.fill}
-                        stroke={colors.stroke}
-                        strokeWidth='2'
-                        opacity={item.type === 'shelf' ? 1 : 0.85}
-                      />
-                    ) : (
-                      // Render rectangle for all other items
-                      <rect
-                        x={itemX}
-                        y={itemY}
-                        width={itemWidth}
-                        height={itemHeightScaled}
-                        fill={colors.fill}
-                        stroke={colors.stroke}
-                        strokeWidth='2'
-                        rx='1'
-                        opacity={item.type === 'shelf' ? 1 : 0.85}
-                      />
-                    )}
+                {/* Obstructions */}
+                {obstructions.map((obstruction) => (
+                  <g key={obstruction.id}>
+                    <rect
+                      x={offsetX + obstruction.distanceFromLeft * scale}
+                      y={
+                        offsetY +
+                        (wall.height -
+                          obstruction.distanceFromFloor -
+                          obstruction.height) *
+                          scale
+                      }
+                      width={obstruction.width * scale}
+                      height={obstruction.height * scale}
+                      fill={getObstructionColor(obstruction.type)}
+                      fillOpacity='0.3'
+                      stroke={getObstructionColor(obstruction.type)}
+                      strokeWidth='2'
+                      rx='2'
+                    />
                     <text
                       x={
                         offsetX +
-                        (item.distanceFromLeft + item.width / 2) * scale
+                        (obstruction.distanceFromLeft + obstruction.width / 2) *
+                          scale
                       }
                       y={
                         offsetY +
                         (wall.height -
-                          item.distanceFromFloor -
-                          itemHeight / 2) *
+                          obstruction.distanceFromFloor -
+                          obstruction.height / 2) *
                           scale
                       }
                       textAnchor='middle'
-                      className='text-xs font-bold'
-                      fill='white'
+                      className='text-xs font-medium'
+                      fill={getObstructionColor(obstruction.type)}
                       dominantBaseline='middle'
                     >
-                      {item.type.toUpperCase()} {index + 1}
+                      {obstruction.type.toUpperCase()}
                     </text>
+                  </g>
+                ))}
 
-                    {/* Weight/capacity badge */}
-                    {(itemCapacity || item.weight) && (
-                      <g>
-                        <rect
-                          x={
-                            offsetX +
-                            (item.distanceFromLeft + item.width - 3) * scale
-                          }
-                          y={
-                            offsetY +
-                            (wall.height -
-                              item.distanceFromFloor -
-                              itemHeight -
-                              1.5) *
-                              scale
-                          }
-                          width='52'
-                          height='18'
-                          fill='#1E40AF'
-                          stroke='#1E3A8A'
-                          strokeWidth='1'
-                          rx='4'
-                          opacity='0.95'
+                {/* Items (Shelves and Wall Items) */}
+                {shelves.map((item, index) => {
+                  // Calculate capacity for shelves to show on schematic
+                  const itemMaterials =
+                    item.type === 'shelf'
+                      ? calculateMaterials(
+                          [item],
+                          (wallMaterial as WallMaterial) || 'drywall',
+                          (mountingType as MountingType) || 'floating',
+                          { useStuds }
+                        )
+                      : null;
+                  const itemCapacity =
+                    itemMaterials?.perShelf?.[0]?.maxWeightCapacity;
+
+                  // Determine item color and style based on type
+                  const getItemColor = () => {
+                    switch (item.type) {
+                      case 'shelf':
+                        return { fill: '#059669', stroke: '#047857' };
+                      case 'picture':
+                        return { fill: '#8B5CF6', stroke: '#7C3AED' };
+                      case 'poster':
+                        return { fill: '#EC4899', stroke: '#DB2777' };
+                      case 'mirror':
+                        return { fill: '#06B6D4', stroke: '#0891B2' };
+                      case 'tv':
+                        return { fill: '#EF4444', stroke: '#DC2626' };
+                      case 'artpiece':
+                        return { fill: '#F59E0B', stroke: '#D97706' };
+                      default:
+                        return { fill: '#6B7280', stroke: '#4B5563' };
+                    }
+                  };
+
+                  const colors = getItemColor();
+                  const itemHeight = item.height || 1;
+                  const itemX = offsetX + item.distanceFromLeft * scale;
+                  const itemY =
+                    offsetY +
+                    (wall.height - item.distanceFromFloor - itemHeight) * scale;
+                  const itemWidth = item.width * scale;
+                  const itemHeightScaled = itemHeight * scale;
+
+                  // Determine if item is circular/oval based on shape
+                  const isCircular =
+                    item.type === 'mirror' &&
+                    (item.shape === 'circle' || item.shape === 'oval');
+
+                  return (
+                    <g key={item.id}>
+                      {isCircular ? (
+                        // Render ellipse for circle/oval mirrors
+                        <ellipse
+                          cx={itemX + itemWidth / 2}
+                          cy={itemY + itemHeightScaled / 2}
+                          rx={itemWidth / 2}
+                          ry={itemHeightScaled / 2}
+                          fill={colors.fill}
+                          stroke={colors.stroke}
+                          strokeWidth='2'
+                          opacity={item.type === 'shelf' ? 1 : 0.85}
                         />
-                        <text
-                          x={
-                            offsetX +
-                            (item.distanceFromLeft + item.width - 3) * scale +
-                            26
-                          }
-                          y={
-                            offsetY +
-                            (wall.height -
-                              item.distanceFromFloor -
-                              itemHeight -
-                              1.5) *
-                              scale +
-                            9
-                          }
-                          textAnchor='middle'
-                          dominantBaseline='middle'
-                          className='text-xs font-bold'
-                          fill='white'
-                          fontSize='9'
-                        >
-                          {itemCapacity || item.weight || 0}lb
-                        </text>
-                      </g>
-                    )}
-
-                    {/* Item measurement lines */}
-                    <line
-                      x1={offsetX}
-                      y1={
-                        offsetY + (wall.height - item.distanceFromFloor) * scale
-                      }
-                      x2={offsetX + item.distanceFromLeft * scale}
-                      y2={
-                        offsetY + (wall.height - item.distanceFromFloor) * scale
-                      }
-                      stroke='#6B7280'
-                      strokeWidth='1'
-                      strokeDasharray='2,2'
-                    />
-                    <line
-                      x1={offsetX + item.distanceFromLeft * scale}
-                      y1={offsetY + scaledHeight}
-                      x2={offsetX + item.distanceFromLeft * scale}
-                      y2={
-                        offsetY + (wall.height - item.distanceFromFloor) * scale
-                      }
-                      stroke='#6B7280'
-                      strokeWidth='1'
-                      strokeDasharray='2,2'
-                    />
-
-                    {/* Bracket markers (for shelves only) */}
-                    {item.type === 'shelf' &&
-                      (() => {
-                        // Derive brackets for this shelf using current settings
-                        const perShelf =
-                          calculateMaterials(
-                            [item],
-                            (wallMaterial as WallMaterial) || 'drywall',
-                            (mountingType as MountingType) || 'floating',
-                            { useStuds }
-                          ).perShelf || [];
-                        const bracketsForThisShelf = perShelf[0]?.brackets || 2;
-                        const bracketPositions =
-                          perShelf[0]?.bracketPositions || [];
-
-                        const positions: number[] = [];
-                        for (let i = 0; i < bracketsForThisShelf; i++) {
-                          // distribute across shelf width (centered positions)
-                          const px =
-                            item.distanceFromLeft +
-                            (item.width * (i + 0.5)) / bracketsForThisShelf;
-                          positions.push(px);
+                      ) : (
+                        // Render rectangle for all other items
+                        <rect
+                          x={itemX}
+                          y={itemY}
+                          width={itemWidth}
+                          height={itemHeightScaled}
+                          fill={colors.fill}
+                          stroke={colors.stroke}
+                          strokeWidth='2'
+                          rx='1'
+                          opacity={item.type === 'shelf' ? 1 : 0.85}
+                        />
+                      )}
+                      <text
+                        x={
+                          offsetX +
+                          (item.distanceFromLeft + item.width / 2) * scale
                         }
+                        y={
+                          offsetY +
+                          (wall.height -
+                            item.distanceFromFloor -
+                            itemHeight / 2) *
+                            scale
+                        }
+                        textAnchor='middle'
+                        className='text-xs font-bold'
+                        fill='white'
+                        dominantBaseline='middle'
+                      >
+                        {item.type.toUpperCase()} {index + 1}
+                      </text>
 
-                        return (
-                          <>
-                            {positions.map((px, bi) => {
-                              const isSelected = selectedShelfId === item.id;
-                              const distanceFromEdge =
-                                bracketPositions[bi] ||
-                                (item.width * (bi + 0.5)) /
-                                  bracketsForThisShelf;
+                      {/* Weight/capacity badge */}
+                      {(itemCapacity || item.weight) && (
+                        <g>
+                          <rect
+                            x={
+                              offsetX +
+                              (item.distanceFromLeft + item.width - 3) * scale
+                            }
+                            y={
+                              offsetY +
+                              (wall.height -
+                                item.distanceFromFloor -
+                                itemHeight -
+                                1.5) *
+                                scale
+                            }
+                            width='52'
+                            height='18'
+                            fill='#1E40AF'
+                            stroke='#1E3A8A'
+                            strokeWidth='1'
+                            rx='4'
+                            opacity='0.95'
+                          />
+                          <text
+                            x={
+                              offsetX +
+                              (item.distanceFromLeft + item.width - 3) * scale +
+                              26
+                            }
+                            y={
+                              offsetY +
+                              (wall.height -
+                                item.distanceFromFloor -
+                                itemHeight -
+                                1.5) *
+                                scale +
+                              9
+                            }
+                            textAnchor='middle'
+                            dominantBaseline='middle'
+                            className='text-xs font-bold'
+                            fill='white'
+                            fontSize='9'
+                          >
+                            {itemCapacity || item.weight || 0}lb
+                          </text>
+                        </g>
+                      )}
 
-                              return (
-                                <g
-                                  key={`br-${item.id}-${bi}`}
-                                  className={`bracket-marker group br-${item.id}`}
-                                  data-shelf-id={item.id}
-                                  onMouseEnter={() =>
-                                    onHoverShelf && onHoverShelf(item.id)
-                                  }
-                                  onMouseLeave={() =>
-                                    onHoverShelf && onHoverShelf(null)
-                                  }
-                                >
-                                  <line
-                                    x1={offsetX + px * scale}
-                                    y1={
-                                      offsetY +
-                                      (wall.height -
-                                        item.distanceFromFloor -
-                                        itemHeight) *
-                                        scale
-                                    }
-                                    x2={offsetX + px * scale}
-                                    y2={
-                                      offsetY +
-                                      (wall.height - item.distanceFromFloor) *
-                                        scale
-                                    }
-                                    stroke={isSelected ? '#b45309' : '#111827'}
-                                    strokeWidth={isSelected ? 3 : 2}
-                                    style={{
-                                      transition:
-                                        'stroke 220ms ease, stroke-width 220ms ease',
-                                      transformOrigin: 'center',
-                                    }}
-                                  />
-                                  <circle
-                                    cx={offsetX + px * scale}
-                                    cy={
-                                      offsetY +
-                                      (wall.height -
-                                        item.distanceFromFloor -
-                                        itemHeight / 2) *
-                                        scale
-                                    }
-                                    r={isSelected ? 4 : 2}
-                                    fill={isSelected ? '#b45309' : '#111827'}
-                                    style={{
-                                      transition:
-                                        'r 220ms ease, fill 220ms ease',
-                                      transformOrigin: 'center',
-                                    }}
-                                  />
-                                  {/* Distance from left edge label */}
-                                  {showBracketDetails && (
-                                    <g>
-                                      <rect
-                                        x={offsetX + px * scale - 22}
-                                        y={
-                                          offsetY +
-                                          (wall.height -
-                                            item.distanceFromFloor -
-                                            itemHeight / 2) *
-                                            scale +
-                                          8
-                                        }
-                                        width='44'
-                                        height='14'
-                                        fill='#F59E0B'
-                                        stroke='#D97706'
-                                        strokeWidth='1'
-                                        rx='3'
-                                        opacity='0.95'
-                                      />
-                                      <text
-                                        x={offsetX + px * scale}
-                                        y={
-                                          offsetY +
-                                          (wall.height -
-                                            item.distanceFromFloor -
-                                            itemHeight / 2) *
-                                            scale +
-                                          15
-                                        }
-                                        textAnchor='middle'
-                                        dominantBaseline='middle'
-                                        className='text-xs font-bold'
-                                        fill='white'
-                                        fontSize='8'
-                                      >
-                                        {distanceFromEdge.toFixed(1)}"
-                                      </text>
-                                    </g>
-                                  )}
-                                </g>
-                              );
-                            })}
-                            {/* Bracket spacing indicators */}
-                            {showSpacing &&
-                              positions.length > 1 &&
-                              positions.map((px, bi) => {
-                                if (bi === positions.length - 1) return null;
-                                const nextPx = positions[bi + 1];
-                                const spacing = nextPx - px;
-                                const midX = (px + nextPx) / 2;
-                                const y = item.distanceFromFloor + 2.5;
+                      {/* Item measurement lines */}
+                      <line
+                        x1={offsetX}
+                        y1={
+                          offsetY +
+                          (wall.height - item.distanceFromFloor) * scale
+                        }
+                        x2={offsetX + item.distanceFromLeft * scale}
+                        y2={
+                          offsetY +
+                          (wall.height - item.distanceFromFloor) * scale
+                        }
+                        stroke='#6B7280'
+                        strokeWidth='1'
+                        strokeDasharray='2,2'
+                      />
+                      <line
+                        x1={offsetX + item.distanceFromLeft * scale}
+                        y1={offsetY + scaledHeight}
+                        x2={offsetX + item.distanceFromLeft * scale}
+                        y2={
+                          offsetY +
+                          (wall.height - item.distanceFromFloor) * scale
+                        }
+                        stroke='#6B7280'
+                        strokeWidth='1'
+                        strokeDasharray='2,2'
+                      />
+
+                      {/* Bracket markers (for shelves only) */}
+                      {item.type === 'shelf' &&
+                        (() => {
+                          // Derive brackets for this shelf using current settings
+                          const perShelf =
+                            calculateMaterials(
+                              [item],
+                              (wallMaterial as WallMaterial) || 'drywall',
+                              (mountingType as MountingType) || 'floating',
+                              { useStuds }
+                            ).perShelf || [];
+                          const bracketsForThisShelf =
+                            perShelf[0]?.brackets || 2;
+                          const bracketPositions =
+                            perShelf[0]?.bracketPositions || [];
+
+                          const positions: number[] = [];
+                          for (let i = 0; i < bracketsForThisShelf; i++) {
+                            // distribute across shelf width (centered positions)
+                            const px =
+                              item.distanceFromLeft +
+                              (item.width * (i + 0.5)) / bracketsForThisShelf;
+                            positions.push(px);
+                          }
+
+                          return (
+                            <>
+                              {positions.map((px, bi) => {
+                                const isSelected = selectedShelfId === item.id;
+                                const distanceFromEdge =
+                                  bracketPositions[bi] ||
+                                  (item.width * (bi + 0.5)) /
+                                    bracketsForThisShelf;
 
                                 return (
-                                  <g key={`spacing-${item.id}-${bi}`}>
-                                    {/* Spacing line */}
+                                  <g
+                                    key={`br-${item.id}-${bi}`}
+                                    className={`bracket-marker group br-${item.id}`}
+                                    data-shelf-id={item.id}
+                                    onMouseEnter={() =>
+                                      onHoverShelf && onHoverShelf(item.id)
+                                    }
+                                    onMouseLeave={() =>
+                                      onHoverShelf && onHoverShelf(null)
+                                    }
+                                  >
                                     <line
                                       x1={offsetX + px * scale}
-                                      y1={offsetY + (wall.height - y) * scale}
-                                      x2={offsetX + nextPx * scale}
-                                      y2={offsetY + (wall.height - y) * scale}
-                                      stroke='#6366F1'
-                                      strokeWidth='1.5'
-                                      strokeDasharray='3,2'
-                                      opacity='0.7'
-                                    />
-                                    {/* Spacing measurement */}
-                                    <rect
-                                      x={offsetX + midX * scale - 20}
-                                      y={
-                                        offsetY + (wall.height - y) * scale - 10
+                                      y1={
+                                        offsetY +
+                                        (wall.height -
+                                          item.distanceFromFloor -
+                                          itemHeight) *
+                                          scale
                                       }
-                                      width='40'
-                                      height='16'
-                                      fill='#6366F1'
-                                      rx='3'
-                                      opacity='0.9'
+                                      x2={offsetX + px * scale}
+                                      y2={
+                                        offsetY +
+                                        (wall.height - item.distanceFromFloor) *
+                                          scale
+                                      }
+                                      stroke={
+                                        isSelected ? '#b45309' : '#111827'
+                                      }
+                                      strokeWidth={isSelected ? 3 : 2}
+                                      style={{
+                                        transition:
+                                          'stroke 220ms ease, stroke-width 220ms ease',
+                                        transformOrigin: 'center',
+                                      }}
                                     />
-                                    <text
-                                      x={offsetX + midX * scale}
-                                      y={offsetY + (wall.height - y) * scale}
-                                      textAnchor='middle'
-                                      dominantBaseline='middle'
-                                      className='text-xs font-semibold'
-                                      fill='white'
-                                      fontSize='9'
-                                    >
-                                      {spacing.toFixed(1)}"
-                                    </text>
+                                    <circle
+                                      cx={offsetX + px * scale}
+                                      cy={
+                                        offsetY +
+                                        (wall.height -
+                                          item.distanceFromFloor -
+                                          itemHeight / 2) *
+                                          scale
+                                      }
+                                      r={isSelected ? 4 : 2}
+                                      fill={isSelected ? '#b45309' : '#111827'}
+                                      style={{
+                                        transition:
+                                          'r 220ms ease, fill 220ms ease',
+                                        transformOrigin: 'center',
+                                      }}
+                                    />
+                                    {/* Distance from left edge label */}
+                                    {showBracketDetails && (
+                                      <g>
+                                        <rect
+                                          x={offsetX + px * scale - 22}
+                                          y={
+                                            offsetY +
+                                            (wall.height -
+                                              item.distanceFromFloor -
+                                              itemHeight / 2) *
+                                              scale +
+                                            8
+                                          }
+                                          width='44'
+                                          height='14'
+                                          fill='#F59E0B'
+                                          stroke='#D97706'
+                                          strokeWidth='1'
+                                          rx='3'
+                                          opacity='0.95'
+                                        />
+                                        <text
+                                          x={offsetX + px * scale}
+                                          y={
+                                            offsetY +
+                                            (wall.height -
+                                              item.distanceFromFloor -
+                                              itemHeight / 2) *
+                                              scale +
+                                            15
+                                          }
+                                          textAnchor='middle'
+                                          dominantBaseline='middle'
+                                          className='text-xs font-bold'
+                                          fill='white'
+                                          fontSize='8'
+                                        >
+                                          {distanceFromEdge.toFixed(1)}"
+                                        </text>
+                                      </g>
+                                    )}
                                   </g>
                                 );
                               })}
-                          </>
-                        );
-                      })()}
-                  </g>
-                );
-              })}
+                              {/* Bracket spacing indicators */}
+                              {showSpacing &&
+                                positions.length > 1 &&
+                                positions.map((px, bi) => {
+                                  if (bi === positions.length - 1) return null;
+                                  const nextPx = positions[bi + 1];
+                                  const spacing = nextPx - px;
+                                  const midX = (px + nextPx) / 2;
+                                  const y = item.distanceFromFloor + 2.5;
 
+                                  return (
+                                    <g key={`spacing-${item.id}-${bi}`}>
+                                      {/* Spacing line */}
+                                      <line
+                                        x1={offsetX + px * scale}
+                                        y1={offsetY + (wall.height - y) * scale}
+                                        x2={offsetX + nextPx * scale}
+                                        y2={offsetY + (wall.height - y) * scale}
+                                        stroke='#6366F1'
+                                        strokeWidth='1.5'
+                                        strokeDasharray='3,2'
+                                        opacity='0.7'
+                                      />
+                                      {/* Spacing measurement */}
+                                      <rect
+                                        x={offsetX + midX * scale - 20}
+                                        y={
+                                          offsetY +
+                                          (wall.height - y) * scale -
+                                          10
+                                        }
+                                        width='40'
+                                        height='16'
+                                        fill='#6366F1'
+                                        rx='3'
+                                        opacity='0.9'
+                                      />
+                                      <text
+                                        x={offsetX + midX * scale}
+                                        y={offsetY + (wall.height - y) * scale}
+                                        textAnchor='middle'
+                                        dominantBaseline='middle'
+                                        className='text-xs font-semibold'
+                                        fill='white'
+                                        fontSize='9'
+                                      >
+                                        {spacing.toFixed(1)}"
+                                      </text>
+                                    </g>
+                                  );
+                                })}
+                            </>
+                          );
+                        })()}
+                    </g>
+                  );
+                })}
+              </g>{' '}
+              {/* End draggable wall group */}
               {/* Grid lines for reference */}
               <defs>
                 <pattern
@@ -640,16 +820,32 @@ export function SchematicDisplay({
                   />
                 </pattern>
               </defs>
-              <rect
-                x={offsetX}
-                y={offsetY}
-                width={scaledWidth}
-                height={scaledHeight}
-                fill='url(#grid)'
-                opacity='0.3'
-              />
             </svg>
           </div>
+
+          {/* Alignment help and reset - shown when background photo is active */}
+          {useBackgroundPhoto && onWallAlignmentChange && (
+            <div className='mt-3 flex items-center justify-between gap-4 text-sm'>
+              <div className='flex items-center gap-2 text-gray-600'>
+                <span className='text-lg'>💡</span>
+                <span>
+                  Drag the wall rectangle to align with your photo. Use scroll
+                  wheel to scale.
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  // Reset to centered position in base container coordinates
+                  const resetX = (baseWidth - wall.width * 1) / 2;
+                  const resetY = (baseHeight - wall.height * 1) / 2;
+                  onWallAlignmentChange(resetX, resetY, 1);
+                }}
+                className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors whitespace-nowrap'
+              >
+                Reset Position
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Legend */}

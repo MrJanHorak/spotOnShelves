@@ -1,4 +1,5 @@
 import { Plus, X, Home } from 'lucide-react';
+import { useRef, useState } from 'react';
 import {
   WallDimensions,
   ShelfDimensions,
@@ -48,6 +49,207 @@ export function InputSection({
   onObstructionsChange,
   onSettingsChange,
 }: InputSectionProps) {
+  // Aligner modal state for manual 4-corner alignment
+  const [alignOpen, setAlignOpen] = useState(false);
+  const [alignDisplaySize, setAlignDisplaySize] = useState<{
+    w: number;
+    h: number;
+  }>({ w: 0, h: 0 });
+  const [alignHandles, setAlignHandles] = useState<
+    { x: number; y: number }[] | null
+  >(null);
+  const alignImgRef = useRef<HTMLImageElement | null>(null);
+  const draggingHandleRef = useRef<number | null>(null);
+
+  // Open the aligner and initialize handles based on current image
+  const openAligner = () => {
+    if (!settings.backgroundImage) return;
+    const img = new Image();
+    img.onload = () => {
+      alignImgRef.current = img;
+      // Fit image to modal area (max 900px width)
+      const maxW = Math.min(900, window.innerWidth - 120);
+      const scale = Math.min(1, maxW / img.width);
+      const dispW = Math.round(img.width * scale);
+      const dispH = Math.round(img.height * scale);
+      setAlignDisplaySize({ w: dispW, h: dispH });
+      // default handles on corners of displayed image
+      setAlignHandles([
+        { x: 8, y: 8 },
+        { x: dispW - 8, y: 8 },
+        { x: dispW - 8, y: dispH - 8 },
+        { x: 8, y: dispH - 8 },
+      ]);
+      setAlignOpen(true);
+    };
+    img.src = settings.backgroundImage as string;
+  };
+
+  // closeAligner removed; use setAlignOpen(false) directly
+
+  // Pointer handlers for dragging alignment handles on the displayed image
+  const onAlignPointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    idx: number
+  ) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    draggingHandleRef.current = idx;
+  };
+
+  const onAlignPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (draggingHandleRef.current === null) return;
+    if (!alignHandles || !alignImgRef.current) return;
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    setAlignHandles((prev) => {
+      if (!prev) return prev;
+      const next = prev.map((p) => ({ ...p }));
+      next[draggingHandleRef.current as number] = { x, y };
+      return next;
+    });
+  };
+
+  const onAlignPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+    draggingHandleRef.current = null;
+  };
+
+  // Apply alignment: warp quad into rectangle and save into settings
+  const applyAlignment = async () => {
+    if (!alignImgRef.current || !alignHandles) return;
+    // map displayed coords back to original image coords
+    const img = alignImgRef.current;
+    const dispW = alignDisplaySize.w || img.width;
+    const dispH = alignDisplaySize.h || img.height;
+    const scaleX = img.width / dispW;
+    const scaleY = img.height / dispH;
+    const srcPts = alignHandles.map((p) => ({
+      x: p.x * scaleX,
+      y: p.y * scaleY,
+    }));
+    // target rect size: pick reasonable resolution (1200px wide)
+    const tw = Math.max(600, Math.min(2000, Math.round(1200)));
+    const th = Math.round((wall.height / Math.max(1, wall.width)) * tw);
+    const warped = warpQuadToRect(img, srcPts, tw, th);
+    if (warped) {
+      onSettingsChange({
+        ...settings,
+        backgroundImage: warped,
+        backgroundFitMode: 'cover',
+        useBackgroundPhoto: true,
+      });
+    }
+    setAlignOpen(false);
+  };
+
+  // Utility: solve 6x6 linear system for affine transform mapping srcTri -> dstTri
+  const solveAffine = (
+    src: { x: number; y: number }[],
+    dst: { x: number; y: number }[]
+  ) => {
+    // Solve for a,b,c,d,e,f where x' = a*x + b*y + c; y' = d*x + e*y + f
+    // Build matrix and solve using Cramer's rule / Gaussian elimination (6x6)
+    const A: number[][] = [];
+    const B: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const sx = src[i].x;
+      const sy = src[i].y;
+      A.push([sx, sy, 1, 0, 0, 0]);
+      B.push(dst[i].x);
+      A.push([0, 0, 0, sx, sy, 1]);
+      B.push(dst[i].y);
+    }
+    // Gaussian elimination (6x6)
+    const n = 6;
+    for (let i = 0; i < n; i++) {
+      // find pivot
+      let piv = i;
+      for (let r = i; r < n; r++) {
+        if (Math.abs(A[r][i]) > Math.abs(A[piv][i])) piv = r;
+      }
+      if (piv !== i) {
+        [A[i], A[piv]] = [A[piv], A[i]];
+        [B[i], B[piv]] = [B[piv], B[i]];
+      }
+      const ai = A[i][i];
+      if (Math.abs(ai) < 1e-12) continue;
+      for (let j = i; j < n; j++) A[i][j] /= ai;
+      B[i] /= ai;
+      for (let r = 0; r < n; r++) {
+        if (r === i) continue;
+        const factor = A[r][i];
+        for (let c = i; c < n; c++) A[r][c] -= factor * A[i][c];
+        B[r] -= factor * B[i];
+      }
+    }
+    return B; // [a, b, c, d, e, f]
+  };
+
+  // Draw one triangle from src to dst using affine transform
+  const drawTriangle = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    srcTri: { x: number; y: number }[],
+    dstTri: { x: number; y: number }[]
+  ) => {
+    // compute affine params
+    const [a, b, c, d, e, f] = solveAffine(srcTri, dstTri);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(dstTri[0].x, dstTri[0].y);
+    ctx.lineTo(dstTri[1].x, dstTri[1].y);
+    ctx.lineTo(dstTri[2].x, dstTri[2].y);
+    ctx.closePath();
+    ctx.clip();
+    // setTransform(a, b, c, d, e, f) maps x' = a*x + c*y + e; y' = b*x + d*y + f
+    // Our solved form: x' = a*x + b*y + c; y' = d*x + e*y + f
+    // So pass (a, d, b, e, c, f) to match canvas ordering
+    ctx.setTransform(a, d, b, e, c, f);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  };
+
+  // Warp the selected quad (srcPts in image pixel coords) into a rectangle of size tw x th
+  const warpQuadToRect = (
+    img: HTMLImageElement,
+    srcPts: { x: number; y: number }[],
+    tw: number,
+    th: number
+  ) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    // Destination rectangle corners
+    const dst = [
+      { x: 0, y: 0 },
+      { x: tw, y: 0 },
+      { x: tw, y: th },
+      { x: 0, y: th },
+    ];
+    // Triangulate: map src [0,1,2] -> dst [0,1,2] and src [0,2,3] -> dst [0,2,3]
+    drawTriangle(
+      ctx,
+      img,
+      [srcPts[0], srcPts[1], srcPts[2]],
+      [dst[0], dst[1], dst[2]]
+    );
+    drawTriangle(
+      ctx,
+      img,
+      [srcPts[0], srcPts[2], srcPts[3]],
+      [dst[0], dst[2], dst[3]]
+    );
+    return canvas.toDataURL('image/jpeg', 0.86);
+  };
+
   const addShelf = () => {
     const newShelf: ShelfDimensions = {
       id: `shelf-${Date.now()}`,
@@ -93,6 +295,42 @@ export function InputSection({
     };
     onObstructionsChange([...obstructions, newObstruction]);
   };
+
+  // Compress / resize image on upload to reduce memory and PDF export size.
+  // Returns a data URL.
+  const resizeImageFile = (file: File, maxWidth = 1600, maxHeight = 1600) =>
+    new Promise<string | null>((resolve) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          const width = img.width;
+          const height = img.height;
+          let targetWidth = width;
+          let targetHeight = height;
+
+          if (width > maxWidth || height > maxHeight) {
+            const scale = Math.min(maxWidth / width, maxHeight / height);
+            targetWidth = Math.round(width * scale);
+            targetHeight = Math.round(height * scale);
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+          // Export as JPEG to save size; quality 0.8 is a good tradeoff.
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(dataUrl);
+        };
+        img.onerror = () => resolve(null);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
 
   const removeObstruction = (id: string) => {
     onObstructionsChange(
@@ -190,6 +428,209 @@ export function InputSection({
               <option value='right'>Right Aligned</option>
             </select>
           </div>
+          {/* Background Photo Controls */}
+          <div className='md:col-span-2 lg:col-span-1'>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>
+              Background Photo
+            </label>
+            <div className='flex items-center gap-2'>
+              <input
+                type='file'
+                accept='image/*'
+                capture='environment'
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const dataUrl = await resizeImageFile(file, 1600, 1600);
+                  if (dataUrl) {
+                    onSettingsChange({
+                      ...settings,
+                      backgroundImage: dataUrl,
+                      backgroundOpacity: settings.backgroundOpacity ?? 0.6,
+                      useBackgroundPhoto: true,
+                    });
+                  } else {
+                    // fallback: clear
+                    onSettingsChange({
+                      ...settings,
+                      backgroundImage: undefined,
+                    });
+                  }
+                }}
+                className='text-sm'
+              />
+              {settings.backgroundImage && (
+                <button
+                  type='button'
+                  onClick={() =>
+                    onSettingsChange({
+                      ...settings,
+                      backgroundImage: undefined,
+                      useBackgroundPhoto: false,
+                    })
+                  }
+                  className='px-3 py-1 bg-red-100 text-red-700 rounded'
+                >
+                  Remove
+                </button>
+              )}
+              {settings.backgroundImage && (
+                <button
+                  type='button'
+                  onClick={openAligner}
+                  className='px-3 py-1 bg-indigo-100 text-indigo-700 rounded'
+                >
+                  Align Wall
+                </button>
+              )}
+            </div>
+            <div className='flex items-center gap-3 mt-2'>
+              <label className='flex items-center gap-2 text-sm'>
+                <input
+                  type='checkbox'
+                  checked={settings.useBackgroundPhoto || false}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      useBackgroundPhoto: e.target.checked,
+                    })
+                  }
+                  className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                />
+                <span>Use photo background</span>
+              </label>
+            </div>
+            <div className='mt-3 grid grid-cols-1 gap-2'>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Fit Mode
+              </label>
+              <select
+                value={settings.backgroundFitMode || 'cover'}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    backgroundFitMode: e.target.value as
+                      | 'cover'
+                      | 'contain'
+                      | 'fit-to-wall',
+                  })
+                }
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              >
+                <option value='cover'>Cover (fill container)</option>
+                <option value='contain'>Contain (fit inside)</option>
+                <option value='fit-to-wall'>Fit-to-wall (map width)</option>
+              </select>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Manual Background Scale
+                </label>
+                <input
+                  type='number'
+                  value={settings.backgroundScale ?? 1}
+                  min={0.1}
+                  step={0.05}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      backgroundScale: parseFloat(e.target.value) || 1,
+                    })
+                  }
+                  className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                />
+                <p className='text-xs text-gray-500 mt-1'>
+                  When using Fit-to-wall, set scale to map the photo to wall
+                  measurements. 1 = no zoom.
+                </p>
+              </div>
+            </div>
+            <div className='mt-2'>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Photo Opacity
+              </label>
+              <input
+                type='range'
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.backgroundOpacity ?? 0.6}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    backgroundOpacity: parseFloat(e.target.value),
+                  })
+                }
+                className='w-full'
+              />
+              <div className='text-xs text-gray-500 mt-1'>
+                Adjust how much the photo shows through the schematic.
+              </div>
+            </div>
+          </div>
+          {/* Aligner modal */}
+          {alignOpen && alignHandles && (
+            <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40'>
+              <div className='bg-white rounded-lg shadow-lg p-4 max-w-[960px] w-full'>
+                <h3 className='text-lg font-semibold mb-3'>Align Wall Photo</h3>
+                <div
+                  className='relative bg-gray-100 mx-auto'
+                  style={{
+                    width: alignDisplaySize.w,
+                    height: alignDisplaySize.h,
+                  }}
+                  onPointerMove={onAlignPointerMove}
+                  onPointerUp={onAlignPointerUp}
+                >
+                  <img
+                    src={settings.backgroundImage as string}
+                    alt='Align preview'
+                    style={{
+                      width: alignDisplaySize.w,
+                      height: alignDisplaySize.h,
+                      display: 'block',
+                    }}
+                    draggable={false}
+                  />
+                  {/* corner handles */}
+                  {alignHandles.map((p, i) => (
+                    <div
+                      key={i}
+                      role='slider'
+                      aria-label={`Corner ${i + 1}`}
+                      onPointerDown={(e) => onAlignPointerDown(e, i)}
+                      style={{
+                        position: 'absolute',
+                        left: p.x - 8,
+                        top: p.y - 8,
+                        width: 16,
+                        height: 16,
+                        background: 'white',
+                        border: '2px solid rgba(59,130,246,0.9)',
+                        borderRadius: 4,
+                        touchAction: 'none',
+                        cursor: 'move',
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className='mt-3 flex justify-end gap-2'>
+                  <button
+                    onClick={() => setAlignOpen(false)}
+                    className='px-3 py-2 rounded bg-gray-100'
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={applyAlignment}
+                    className='px-3 py-2 rounded bg-indigo-600 text-white'
+                  >
+                    Apply Alignment
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Positioning Controls */}

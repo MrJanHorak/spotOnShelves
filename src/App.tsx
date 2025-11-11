@@ -360,6 +360,20 @@ function App() {
                       studSpacing={settings.studSpacing}
                       customStudLocations={settings.customStudLocations}
                       enableStudDetection={settings.enableStudDetection}
+                      backgroundImage={settings.backgroundImage}
+                      backgroundOpacity={settings.backgroundOpacity}
+                      useBackgroundPhoto={settings.useBackgroundPhoto}
+                      wallAlignmentX={settings.wallAlignmentX}
+                      wallAlignmentY={settings.wallAlignmentY}
+                      wallScaleFactor={settings.wallScaleFactor || 1}
+                      onWallAlignmentChange={(x, y, scale) =>
+                        setSettings((prev) => ({
+                          ...(prev || {}),
+                          wallAlignmentX: x,
+                          wallAlignmentY: y,
+                          wallScaleFactor: scale,
+                        }))
+                      }
                       isCompact={isSchematicCompact}
                     />
                   </div>
@@ -422,7 +436,7 @@ function App() {
                 {/* Tab Headers */}
                 <div
                   className={`flex border-b border-gray-200 bg-gray-50 ${
-                    isSchematicCompact ? 'mt-6=-2px':''
+                    isSchematicCompact ? 'mt-6=-2px' : ''
                   }`}
                 >
                   <button
