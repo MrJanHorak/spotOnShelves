@@ -192,20 +192,49 @@ export function MaterialCalculator({
                 return;
               }
 
-              // Capture schematic
+              // Save current styling
+              const originalStyle = {
+                transform: container.style.transform,
+                width: container.style.width,
+                height: container.style.height,
+              };
+
+              // Force container to render at natural layout (remove transforms)
+              container.style.transform = 'none';
+
+              // Wait for layout to settle
+              await new Promise((resolve) => setTimeout(resolve, 100));
+
+              // Capture schematic exactly as displayed by measuring its on-screen size
               /* eslint-disable @typescript-eslint/no-explicit-any */
               const html2canvasMod: any = await import('html2canvas');
               const html2canvas = html2canvasMod.default || html2canvasMod;
+
               const rect = container.getBoundingClientRect();
+              const cssWidth = Math.max(1, Math.round(rect.width));
+              const cssHeight = Math.max(1, Math.round(rect.height));
+
+              // Temporarily set explicit CSS width/height to ensure stable rendering
+              const prevWidth = container.style.width;
+              const prevHeight = container.style.height;
+              container.style.width = `${cssWidth}px`;
+              container.style.height = `${cssHeight}px`;
+
               const canvas = await html2canvas(container as HTMLElement, {
                 backgroundColor: '#ffffff',
-                scale: 2,
-                scrollX: -window.scrollX,
-                scrollY: -window.scrollY,
-                width: Math.ceil(rect.width),
-                height: Math.ceil(rect.height),
+                scale: 2, // High quality 2x
+                useCORS: true, // Allow cross-origin images
+                allowTaint: true,
+                logging: false,
+                width: cssWidth,
+                height: cssHeight,
               });
               /* eslint-enable @typescript-eslint/no-explicit-any */
+
+              // Restore original styling
+              container.style.transform = originalStyle.transform;
+              container.style.width = prevWidth;
+              container.style.height = prevHeight;
 
               // Generate comprehensive PDF
               const blob = await generateComprehensivePDF(
@@ -216,7 +245,10 @@ export function MaterialCalculator({
                 estimate,
                 result,
                 canvas,
-                pdfPageSize
+                cssWidth,
+                cssHeight,
+                pdfPageSize,
+                1 // widthAdjust: default 1.0, tweak this if you want slightly wider image
               );
 
               // Download

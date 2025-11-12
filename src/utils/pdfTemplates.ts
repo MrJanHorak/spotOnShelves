@@ -46,7 +46,9 @@ export async function generateDrillingTemplate(
   const info = [
     `Shelf ID: ${shelf.id}`,
     `Width: ${shelf.width.toFixed(1)} ${unit === 'inches' ? 'in' : 'cm'}`,
-    `Depth: ${shelf.depth.toFixed(1)} ${unit === 'inches' ? 'in' : 'cm'}`,
+    `Depth: ${(shelf.depth ?? 0).toFixed(1)} ${
+      unit === 'inches' ? 'in' : 'cm'
+    }`,
     `Distance from left wall: ${shelf.distanceFromLeft.toFixed(1)} ${
       unit === 'inches' ? 'in' : 'cm'
     }`,
@@ -640,7 +642,10 @@ export async function generateComprehensivePDF(
   materialEstimate: MaterialEstimate,
   result: CalculationResult,
   schematicCanvas: HTMLCanvasElement,
-  pageSize: 'Letter' | 'A4' = 'Letter'
+  schematicCssWidth: number,
+  schematicCssHeight: number,
+  pageSize: 'Letter' | 'A4' = 'Letter',
+  widthAdjust: number = 1
 ): Promise<Blob> {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const pdfLib: any = await import('pdf-lib');
@@ -747,7 +752,9 @@ export async function generateComprehensivePDF(
     });
     y -= 16;
     page1.drawText(
-      `  Width: ${shelf.width.toFixed(1)}", Depth: ${shelf.depth.toFixed(1)}"`,
+      `  Width: ${shelf.width.toFixed(1)}", Depth: ${(shelf.depth ?? 0).toFixed(
+        1
+      )}"`,
       { x: margin + 30, y, size: 10, font }
     );
     y -= 14;
@@ -832,12 +839,15 @@ export async function generateComprehensivePDF(
   const CSS_PX_PER_INCH = 96;
   const pxToPoints = (px: number) => (px * POINTS_PER_INCH) / CSS_PX_PER_INCH;
 
-  const imgWpt = pxToPoints(schematicCanvas.width);
-  const imgHpt = pxToPoints(schematicCanvas.height);
+  // schematicCanvas.width/height are device pixel dimensions (css px * scale).
+  // We want to size the image in the PDF according to the CSS pixel dimensions
+  // as it appears on the page. Use the measured CSS width/height passed from caller.
+  const imgWpt = pxToPoints(schematicCssWidth);
+  const imgHpt = pxToPoints(schematicCssHeight);
   const availW = pageWidth - 2 * margin;
   const availH = y - margin - 60; // Leave space for legend
   const scale = Math.min(availW / imgWpt, availH / imgHpt, 1);
-  const drawW = imgWpt * scale;
+  const drawW = imgWpt * scale * widthAdjust;
   const drawH = imgHpt * scale;
   const imgX = (pageWidth - drawW) / 2;
   const imgY = margin + 60;

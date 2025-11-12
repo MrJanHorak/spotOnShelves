@@ -275,8 +275,10 @@ export function SchematicDisplay({
             {/* Background photo - full size, positioned absolutely */}
             {useBackgroundPhoto && backgroundImage && (
               <img
+                ref={imgRef}
                 src={backgroundImage}
                 alt='Wall background'
+                crossOrigin="anonymous"
                 style={{
                   position: 'absolute',
                   left: 0,
@@ -284,6 +286,7 @@ export function SchematicDisplay({
                   width: '100%',
                   height: '100%',
                   objectFit: 'contain',
+                  objectPosition: 'center',
                   opacity: backgroundOpacity,
                   pointerEvents: 'none',
                 }}
