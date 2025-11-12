@@ -278,7 +278,7 @@ export function SchematicDisplay({
                 ref={imgRef}
                 src={backgroundImage}
                 alt='Wall background'
-                crossOrigin="anonymous"
+                crossOrigin='anonymous'
                 style={{
                   position: 'absolute',
                   left: 0,
@@ -836,7 +836,7 @@ export function SchematicDisplay({
           </div>
 
           {/* Alignment help and reset - shown when background photo is active */}
- 
+
           {showSidebar && useBackgroundPhoto && onWallAlignmentChange && (
             <div className='mt-3 flex items-center justify-between gap-4 text-sm'>
               <div className='flex items-center gap-2 text-gray-600'>
@@ -857,7 +857,6 @@ export function SchematicDisplay({
               </button>
             </div>
           )}
-        
         </div>
 
         {/* Legend */}
