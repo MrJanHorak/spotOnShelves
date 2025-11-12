@@ -833,7 +833,8 @@ export function SchematicDisplay({
           </div>
 
           {/* Alignment help and reset - shown when background photo is active */}
-          {useBackgroundPhoto && onWallAlignmentChange && (
+ 
+          {showSidebar && useBackgroundPhoto && onWallAlignmentChange && (
             <div className='mt-3 flex items-center justify-between gap-4 text-sm'>
               <div className='flex items-center gap-2 text-gray-600'>
                 <span className='text-lg'>💡</span>
@@ -853,6 +854,7 @@ export function SchematicDisplay({
               </button>
             </div>
           )}
+        
         </div>
 
         {/* Legend */}
