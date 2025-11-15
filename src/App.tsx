@@ -402,7 +402,9 @@ function App() {
                                 ? 'bg-white text-green-600 border-b-2 border-green-600'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                             }`}
-                            disabled={result.shelves.length === 0 || errors.length > 0}
+                            disabled={
+                              result.shelves.length === 0 || errors.length > 0
+                            }
                           >
                             <Ruler className='h-4 w-4' />
                             Measurements & Instructions
@@ -414,7 +416,9 @@ function App() {
                                 ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                             }`}
-                            disabled={result.shelves.length === 0 || errors.length > 0}
+                            disabled={
+                              result.shelves.length === 0 || errors.length > 0
+                            }
                           >
                             <Hammer className='h-4 w-4' />
                             Materials & Export
