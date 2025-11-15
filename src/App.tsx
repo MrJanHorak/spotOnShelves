@@ -376,6 +376,63 @@ function App() {
                       }
                       isCompact={isSchematicCompact}
                     />
+                    {/* MOVED: Tab headers live in the sticky area so they stay visible */}
+                    <div className='mt-4'>
+                      <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
+                        <div
+                          className={`flex border-b border-gray-200 bg-gray-50 ${
+                            isSchematicCompact ? 'mt-6=-2px' : ''
+                          }`}
+                        >
+                          <button
+                            onClick={() => setActiveTab('setup')}
+                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                              activeTab === 'setup'
+                                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Settings className='h-4 w-4' />
+                            Setup & Configuration
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('measurements')}
+                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                              activeTab === 'measurements'
+                                ? 'bg-white text-green-600 border-b-2 border-green-600'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                            }`}
+                            disabled={result.shelves.length === 0 || errors.length > 0}
+                          >
+                            <Ruler className='h-4 w-4' />
+                            Measurements & Instructions
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('materials')}
+                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                              activeTab === 'materials'
+                                ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                            }`}
+                            disabled={result.shelves.length === 0 || errors.length > 0}
+                          >
+                            <Hammer className='h-4 w-4' />
+                            Materials & Export
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('guidance')}
+                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                              activeTab === 'guidance'
+                                ? 'bg-white text-purple-600 border-b-2 border-purple-600'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                            }`}
+                          >
+                            <BookOpen className='h-4 w-4' />
+                            Tools & Guidance
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </section>
                 <div
@@ -431,62 +488,8 @@ function App() {
                 </div>
               )}
 
-              {/* Tabbed Interface */}
+              {/* Tabbed Interface (headers are in the sticky schematic) */}
               <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
-                {/* Tab Headers */}
-                <div
-                  className={`flex border-b border-gray-200 bg-gray-50 ${
-                    isSchematicCompact ? 'mt-6=-2px' : ''
-                  }`}
-                >
-                  <button
-                    onClick={() => setActiveTab('setup')}
-                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                      activeTab === 'setup'
-                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Settings className='h-4 w-4' />
-                    Setup & Configuration
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('measurements')}
-                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                      activeTab === 'measurements'
-                        ? 'bg-white text-green-600 border-b-2 border-green-600'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                    disabled={result.shelves.length === 0 || errors.length > 0}
-                  >
-                    <Ruler className='h-4 w-4' />
-                    Measurements & Instructions
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('materials')}
-                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                      activeTab === 'materials'
-                        ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                    disabled={result.shelves.length === 0 || errors.length > 0}
-                  >
-                    <Hammer className='h-4 w-4' />
-                    Materials & Export
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('guidance')}
-                    className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                      activeTab === 'guidance'
-                        ? 'bg-white text-purple-600 border-b-2 border-purple-600'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                  >
-                    <BookOpen className='h-4 w-4' />
-                    Tools & Guidance
-                  </button>
-                </div>
-
                 {/* Tab Content */}
                 <div className='p-4'>
                   {activeTab === 'setup' && (
