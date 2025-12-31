@@ -33,6 +33,84 @@ function checkOverlap(
   return horizontalOverlap && verticalOverlap;
 }
 
+// Calculate grid spacing metrics for visualization
+function calculateGridSpacingMetrics(
+  wall: WallDimensions,
+  placements: ShelfPlacement[],
+  items: WallItem[]
+) {
+  if (placements.length === 0 || items.length === 0) return undefined;
+
+  // Calculate grid dimensions
+  const cols = Math.ceil(Math.sqrt(placements.length));
+  const rows = Math.ceil(placements.length / cols);
+
+  // Calculate margins and spacings
+  const leftmost = Math.min(...placements.map((p) => p.distanceFromLeft));
+  const rightmost = Math.max(
+    ...placements.map((p) => p.distanceFromLeft + p.width)
+  );
+  const topmost = Math.max(
+    ...placements.map((p) => p.distanceFromFloor + p.height)
+  );
+  const bottommost = Math.min(...placements.map((p) => p.distanceFromFloor));
+
+  const leftMargin = leftmost;
+  const rightMargin = wall.width - rightmost;
+  const topMargin = wall.height - topmost;
+  const bottomMargin = bottommost;
+
+  // Calculate average spacing between items
+  const hSpacings: number[] = [];
+  const vSpacings: number[] = [];
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols - 1; col++) {
+      const idx = row * cols + col;
+      const nextIdx = row * cols + col + 1;
+      if (idx < placements.length && nextIdx < placements.length) {
+        const spacing =
+          placements[nextIdx].distanceFromLeft -
+          (placements[idx].distanceFromLeft + placements[idx].width);
+        if (spacing > 0) hSpacings.push(spacing);
+      }
+    }
+  }
+
+  for (let col = 0; col < cols; col++) {
+    for (let row = 0; row < rows - 1; row++) {
+      const idx = row * cols + col;
+      const nextIdx = (row + 1) * cols + col;
+      if (idx < placements.length && nextIdx < placements.length) {
+        const spacing =
+          placements[idx].distanceFromFloor -
+          (placements[nextIdx].distanceFromFloor + placements[nextIdx].height);
+        if (spacing > 0) vSpacings.push(spacing);
+      }
+    }
+  }
+
+  const avgHSpacing =
+    hSpacings.length > 0
+      ? hSpacings.reduce((a, b) => a + b, 0) / hSpacings.length
+      : 0;
+  const avgVSpacing =
+    vSpacings.length > 0
+      ? vSpacings.reduce((a, b) => a + b, 0) / vSpacings.length
+      : 0;
+
+  return {
+    horizontalSpacing: Math.round(avgHSpacing * 10) / 10,
+    verticalSpacing: Math.round(avgVSpacing * 10) / 10,
+    leftMargin: Math.round(leftMargin * 10) / 10,
+    rightMargin: Math.round(rightMargin * 10) / 10,
+    topMargin: Math.round(topMargin * 10) / 10,
+    bottomMargin: Math.round(bottomMargin * 10) / 10,
+    cols,
+    rows,
+  };
+}
+
 export function validateInputs(
   wall: WallDimensions,
   shelves: ShelfDimensions[],
@@ -587,7 +665,10 @@ export function calculateWallItemPlacement(
   alignment: Alignment = 'center',
   galleryLayout: GalleryLayout = 'custom',
   eyeLevelHeight: number = 57,
-  autoArrange: boolean = true
+  autoArrange: boolean = true,
+  minSpacing: number = 6,
+  horizontalSpacing?: number,
+  verticalSpacing?: number
 ): CalculationResult {
   if (items.length === 0) {
     return {
@@ -670,7 +751,10 @@ export function calculateWallItemPlacement(
       alignment,
       galleryLayout,
       eyeLevelHeight,
-      placements // existing placements to avoid
+      placements, // existing placements to avoid
+      minSpacing,
+      horizontalSpacing,
+      verticalSpacing
     );
     placements.push(...wallItemPlacements);
 
@@ -696,12 +780,24 @@ export function calculateWallItemPlacement(
 
   const instructions = generateInstallationInstructions(items, galleryLayout);
 
+  // Calculate grid spacing metrics if this is a grid layout
+  let gridSpacing: ReturnType<typeof calculateGridSpacingMetrics> | undefined =
+    undefined;
+  if (galleryLayout === 'grid' && wallItems.length > 0) {
+    gridSpacing = calculateGridSpacingMetrics(
+      wall,
+      placements.filter((p) => wallItems.some((w) => w.id === p.id)),
+      wallItems
+    );
+  }
+
   return {
     shelves: placements,
     measurements,
     instructions,
     hardwareRecommendations,
     galleryLayout,
+    gridSpacing,
   };
 }
 
@@ -713,23 +809,33 @@ function applyGalleryLayout(
   alignment: Alignment,
   layout: GalleryLayout,
   eyeLevelHeight: number,
-  existingPlacements: ShelfPlacement[]
+  existingPlacements: ShelfPlacement[],
+  minSpacing: number = 6,
+  horizontalSpacing?: number,
+  verticalSpacing?: number
 ): ShelfPlacement[] {
+  const margin = 4; // margin from wall edges
+  // Use specific spacings if provided, otherwise fall back to minSpacing
+  const hSpacing = horizontalSpacing ?? minSpacing;
+  const vSpacing = verticalSpacing ?? minSpacing;
+
   switch (layout) {
     case 'grid':
       return applyGridLayout(
         wall,
         items,
-        4,
+        margin,
         eyeLevelHeight,
         obstructions,
-        existingPlacements
+        existingPlacements,
+        hSpacing,
+        vSpacing
       );
     case 'salon':
       return applySalonLayout(
         wall,
         items,
-        4,
+        margin,
         eyeLevelHeight,
         obstructions,
         existingPlacements
@@ -739,10 +845,11 @@ function applyGalleryLayout(
         wall,
         items,
         alignment,
-        4,
+        margin,
         eyeLevelHeight,
         obstructions,
-        existingPlacements
+        existingPlacements,
+        minSpacing
       );
     case 'custom':
     default:
@@ -750,7 +857,7 @@ function applyGalleryLayout(
         wall,
         items,
         alignment,
-        4,
+        margin,
         eyeLevelHeight,
         obstructions,
         existingPlacements
@@ -765,10 +872,11 @@ function applyGridLayout(
   margin: number,
   eyeLevelHeight: number,
   obstructions: Obstruction[],
-  existingPlacements: ShelfPlacement[]
+  existingPlacements: ShelfPlacement[],
+  horizontalSpacing: number = 6,
+  verticalSpacing: number = 6
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
-  const spacing = 6; // spacing between items
 
   // Calculate grid dimensions
   const cols = Math.ceil(Math.sqrt(items.length));
@@ -776,10 +884,62 @@ function applyGridLayout(
 
   // Calculate total height needed for the grid
   const maxItemHeight = Math.max(...items.map((item) => item.height));
-  const totalGridHeight = rows * maxItemHeight + (rows - 1) * spacing;
+  const totalGridHeight = rows * maxItemHeight + (rows - 1) * verticalSpacing;
 
-  // Calculate available space
-  const availableWidth = wall.width - 2 * margin;
+  // Find available horizontal zones considering obstructions
+  const horizontalZones: Array<{ start: number; end: number; height: number }> =
+    [];
+
+  // Start with the full wall width
+  const sortedObs = [...obstructions].sort(
+    (a, b) => a.distanceFromLeft - b.distanceFromLeft
+  );
+
+  let currentX = margin;
+  for (const obs of sortedObs) {
+    // Add zone before this obstruction if there's space
+    if (currentX < obs.distanceFromLeft - margin) {
+      horizontalZones.push({
+        start: currentX,
+        end: obs.distanceFromLeft - margin,
+        height: obs.distanceFromFloor,
+      });
+    }
+    // Move past this obstruction
+    currentX = Math.max(currentX, obs.distanceFromLeft + obs.width + margin);
+  }
+
+  // Add final zone if there's remaining space
+  if (currentX < wall.width - margin) {
+    horizontalZones.push({
+      start: currentX,
+      end: wall.width - margin,
+      height: wall.height,
+    });
+  }
+
+  // If no obstructions, use the full width
+  if (horizontalZones.length === 0) {
+    horizontalZones.push({
+      start: margin,
+      end: wall.width - margin,
+      height: wall.height,
+    });
+  }
+
+  // Find the widest available zone to center the grid
+  let bestZone = horizontalZones[0];
+  for (const zone of horizontalZones) {
+    if (zone.end - zone.start > bestZone.end - bestZone.start) {
+      bestZone = zone;
+    }
+  }
+
+  // Calculate available width within the best zone
+  const availableWidth = bestZone.end - bestZone.start;
+
+  // Calculate cell width for this zone
+  const cellWidth = availableWidth / cols;
 
   // Center the grid vertically around eye level
   const gridStartY = eyeLevelHeight - totalGridHeight / 2;
@@ -794,26 +954,55 @@ function applyGridLayout(
     const col = index % cols;
     const row = Math.floor(index / cols);
 
-    // Horizontal positioning - evenly distributed
-    const cellWidth = availableWidth / cols;
-    const x = margin + col * cellWidth + (cellWidth - item.width) / 2;
+    // Horizontal positioning - evenly distributed within the selected zone
+    const x = bestZone.start + col * cellWidth + (cellWidth - item.width) / 2;
 
     // Vertical positioning - centered around eye level
     const y =
       finalStartY +
-      row * (maxItemHeight + spacing) +
+      row * (maxItemHeight + verticalSpacing) +
       (maxItemHeight - item.height) / 2;
+
+    // Check if this position would collide with an obstruction
+    let finalX = x;
+    let finalY = y;
+
+    for (const obs of obstructions) {
+      // Check if item would overlap with obstruction
+      if (
+        x < obs.distanceFromLeft + obs.width &&
+        x + item.width > obs.distanceFromLeft &&
+        y < obs.distanceFromFloor + obs.height &&
+        y + item.height > obs.distanceFromFloor
+      ) {
+        // Try to shift item above or to the side of obstruction
+        if (y + item.height <= obs.distanceFromFloor) {
+          // Can fit above
+          finalY = obs.distanceFromFloor - item.height - margin;
+        } else if (y >= obs.distanceFromFloor + obs.height) {
+          // Can fit below
+          finalY = obs.distanceFromFloor + obs.height + margin;
+        } else if (x + item.width <= obs.distanceFromLeft) {
+          // Can fit to the left
+          finalX = obs.distanceFromLeft - item.width - margin;
+        } else if (x >= obs.distanceFromLeft + obs.width) {
+          // Can fit to the right
+          finalX = obs.distanceFromLeft + obs.width + margin;
+        }
+        break;
+      }
+    }
 
     placements.push({
       id: item.id,
       type: item.type,
       distanceFromLeft: Math.max(
         margin,
-        Math.min(x, wall.width - item.width - margin)
+        Math.min(finalX, wall.width - item.width - margin)
       ),
       distanceFromFloor: Math.max(
         margin,
-        Math.min(y, wall.height - item.height - margin)
+        Math.min(finalY, wall.height - item.height - margin)
       ),
       width: item.width,
       height: item.height,
@@ -906,10 +1095,10 @@ function applyLinearLayout(
   margin: number,
   eyeLevelHeight: number,
   obstructions: Obstruction[],
-  existingPlacements: ShelfPlacement[]
+  existingPlacements: ShelfPlacement[],
+  spacing: number = 6
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
-  const spacing = 6;
 
   // Calculate total width needed
   const totalWidth =

@@ -98,6 +98,16 @@ export interface CalculationResult {
   instructions: string[];
   hardwareRecommendations?: HardwareRecommendation[];
   galleryLayout?: GalleryLayout;
+  gridSpacing?: {
+    horizontalSpacing: number;
+    verticalSpacing: number;
+    leftMargin: number;
+    rightMargin: number;
+    topMargin: number;
+    bottomMargin: number;
+    cols: number;
+    rows: number;
+  };
 }
 
 export interface ProjectSettings {
@@ -114,6 +124,8 @@ export interface ProjectSettings {
   snapToGrid?: boolean; // snap items to grid for alignment
   gridSize?: number; // grid size in inches (default 1)
   minSpacing?: number; // minimum spacing between items in inches
+  horizontalSpacing?: number; // horizontal spacing between items (overrides minSpacing for horizontal)
+  verticalSpacing?: number; // vertical spacing between items (overrides minSpacing for vertical)
   // Optional background/photo used behind the wall schematic.
   // Stored as a data URL (compressed) for project persistence.
   backgroundImage?: string;

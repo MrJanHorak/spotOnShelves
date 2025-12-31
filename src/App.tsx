@@ -144,7 +144,10 @@ function App() {
           settings.alignment,
           settings.galleryLayout || 'custom',
           settings.eyeLevelHeight || 57,
-          settings.autoArrange ?? true
+          settings.autoArrange ?? true,
+          settings.minSpacing ?? 6,
+          settings.horizontalSpacing,
+          settings.verticalSpacing
         );
       } else {
         // Use the original shelf-only calculation
@@ -189,6 +192,9 @@ function App() {
     settings.galleryLayout,
     settings.eyeLevelHeight,
     settings.autoArrange,
+    settings.minSpacing,
+    settings.horizontalSpacing,
+    settings.verticalSpacing,
   ]);
 
   const handleSaveProject = () => {

@@ -706,20 +706,230 @@ export function InputSection({
               <label className='block text-sm font-medium text-gray-700 mb-1'>
                 Minimum Spacing ({settings.unit === 'inches' ? 'in' : 'cm'})
               </label>
-              <input
-                type='number'
-                value={settings.minSpacing ?? 2}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    minSpacing: parseFloat(e.target.value) || 2,
-                  })
-                }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                min='0'
-                step='0.5'
-              />
+              <div className='flex gap-2'>
+                <input
+                  type='number'
+                  value={settings.minSpacing ?? 2}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      minSpacing: parseFloat(e.target.value) || 2,
+                    })
+                  }
+                  className='flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  min='0'
+                  step='0.5'
+                />
+                {settings.galleryLayout === 'grid' &&
+                  shelves.some((item) => item.type !== 'shelf') && (
+                    <button
+                      onClick={() => {
+                        const wallItems = shelves.filter(
+                          (item) => item.type !== 'shelf'
+                        );
+                        if (wallItems.length === 0) return;
+
+                        // Calculate grid dimensions
+                        const cols = Math.ceil(Math.sqrt(wallItems.length));
+                        const rows = Math.ceil(wallItems.length / cols);
+
+                        // Get max item dimensions
+                        const maxWidth = Math.max(
+                          ...wallItems.map((item) => item.width)
+                        );
+                        const maxHeight = Math.max(
+                          ...wallItems.map((item) => item.height)
+                        );
+
+                        // Find available horizontal space considering obstructions
+                        const sortedObs = [...obstructions].sort(
+                          (a, b) => a.distanceFromLeft - b.distanceFromLeft
+                        );
+
+                        const horizontalZones: Array<{
+                          start: number;
+                          end: number;
+                        }> = [];
+                        const margin = 4;
+
+                        let currentX = margin;
+                        for (const obs of sortedObs) {
+                          // Add zone before this obstruction if there's space
+                          if (currentX < obs.distanceFromLeft - margin) {
+                            horizontalZones.push({
+                              start: currentX,
+                              end: obs.distanceFromLeft - margin,
+                            });
+                          }
+                          // Move past this obstruction
+                          currentX = Math.max(
+                            currentX,
+                            obs.distanceFromLeft + obs.width + margin
+                          );
+                        }
+
+                        // Add final zone if there's remaining space
+                        if (currentX < wall.width - margin) {
+                          horizontalZones.push({
+                            start: currentX,
+                            end: wall.width - margin,
+                          });
+                        }
+
+                        // If no obstructions, use the full width
+                        if (horizontalZones.length === 0) {
+                          horizontalZones.push({
+                            start: margin,
+                            end: wall.width - margin,
+                          });
+                        }
+
+                        // Find the widest zone
+                        let bestZone = horizontalZones[0];
+                        for (const zone of horizontalZones) {
+                          if (
+                            zone.end - zone.start >
+                            bestZone.end - bestZone.start
+                          ) {
+                            bestZone = zone;
+                          }
+                        }
+
+                        // Calculate available space in the best zone
+                        const availableWidth = bestZone.end - bestZone.start;
+                        const availableHeight = wall.height - 2 * margin;
+
+                        // Calculate total space needed for items
+                        const totalItemWidth = cols * maxWidth;
+                        const totalItemHeight = rows * maxHeight;
+
+                        // Calculate spacing
+                        const horizontalSpacing =
+                          cols > 1
+                            ? (availableWidth - totalItemWidth) / (cols - 1)
+                            : 0;
+                        const verticalSpacing =
+                          rows > 1
+                            ? (availableHeight - totalItemHeight) / (rows - 1)
+                            : 0;
+
+                        // Use the smaller of the two to maintain proportional spacing
+                        const optimalSpacing = Math.max(
+                          0,
+                          Math.min(horizontalSpacing, verticalSpacing)
+                        );
+
+                        onSettingsChange({
+                          ...settings,
+                          minSpacing: Math.round(optimalSpacing * 10) / 10,
+                        });
+                      }}
+                      className='px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs font-medium whitespace-nowrap'
+                      title='Auto-calculate spacing to fit items evenly in available wall space'
+                    >
+                      Auto
+                    </button>
+                  )}
+              </div>
+              {settings.galleryLayout === 'grid' &&
+                shelves.some((item) => item.type !== 'shelf') && (
+                  <p className='text-xs text-blue-700 mt-2 p-2 bg-blue-50 rounded border border-blue-200'>
+                    <strong>💡 Smart Layout:</strong> Click "Auto" to calculate
+                    ideal spacing that avoids obstructions (like doors) and fits
+                    items evenly in the available space between them.
+                  </p>
+                )}
             </div>
+
+            {/* Advanced: Separate Horizontal/Vertical Spacing */}
+            {settings.galleryLayout === 'grid' &&
+              shelves.some((item) => item.type !== 'shelf') && (
+                <div className='mt-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200'>
+                  <div className='flex items-center gap-2 mb-2'>
+                    <input
+                      type='checkbox'
+                      id='separate-spacing'
+                      checked={
+                        !!(
+                          settings.horizontalSpacing || settings.verticalSpacing
+                        )
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          onSettingsChange({
+                            ...settings,
+                            horizontalSpacing: settings.minSpacing ?? 6,
+                            verticalSpacing: settings.minSpacing ?? 6,
+                          });
+                        } else {
+                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                          const {
+                            horizontalSpacing,
+                            verticalSpacing,
+                            ...rest
+                          } = settings;
+                          onSettingsChange(rest);
+                        }
+                      }}
+                      className='h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded'
+                    />
+                    <label
+                      htmlFor='separate-spacing'
+                      className='text-sm font-medium text-gray-700'
+                    >
+                      Fine-tune spacing
+                    </label>
+                  </div>
+
+                  {(settings.horizontalSpacing || settings.verticalSpacing) && (
+                    <div className='grid grid-cols-2 gap-3 mt-3'>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-700 mb-1'>
+                          Horizontal Gap (
+                          {settings.unit === 'inches' ? 'in' : 'cm'})
+                        </label>
+                        <input
+                          type='number'
+                          value={settings.horizontalSpacing ?? 6}
+                          onChange={(e) =>
+                            onSettingsChange({
+                              ...settings,
+                              horizontalSpacing:
+                                parseFloat(e.target.value) || 6,
+                            })
+                          }
+                          className='w-full px-2 py-1 text-sm border border-purple-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                          min='0'
+                          step='0.5'
+                        />
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-700 mb-1'>
+                          Vertical Gap (
+                          {settings.unit === 'inches' ? 'in' : 'cm'})
+                        </label>
+                        <input
+                          type='number'
+                          value={settings.verticalSpacing ?? 6}
+                          onChange={(e) =>
+                            onSettingsChange({
+                              ...settings,
+                              verticalSpacing: parseFloat(e.target.value) || 6,
+                            })
+                          }
+                          className='w-full px-2 py-1 text-sm border border-purple-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                          min='0'
+                          step='0.5'
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <p className='text-xs text-gray-600 mt-2'>
+                    Enable to independently adjust horizontal and vertical
+                    spacing between items
+                  </p>
+                </div>
+              )}
           </div>
         </div>
 

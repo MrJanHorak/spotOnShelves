@@ -82,6 +82,78 @@ export function MeasurementOutput({
               </div>
             </div>
           )}
+
+          {/* Grid Layout Spacing Details */}
+          {result.gridSpacing && (
+            <div className='mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4'>
+              <h4 className='font-medium text-purple-900 mb-3'>
+                🎯 Grid Layout Analysis
+              </h4>
+              <div className='space-y-3 text-sm'>
+                <div className='grid grid-cols-2 gap-3'>
+                  <div>
+                    <span className='text-gray-600 block'>Grid Size</span>
+                    <div className='font-semibold text-purple-800'>
+                      {result.gridSpacing.cols}×{result.gridSpacing.rows}
+                    </div>
+                  </div>
+                  <div>
+                    <span className='text-gray-600 block'>Horizontal Gap</span>
+                    <div className='font-semibold text-purple-800'>
+                      {formatMeasurement(
+                        result.gridSpacing.horizontalSpacing,
+                        unit
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className='text-gray-600 block'>Vertical Gap</span>
+                    <div className='font-semibold text-purple-800'>
+                      {formatMeasurement(
+                        result.gridSpacing.verticalSpacing,
+                        unit
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className='border-t border-purple-200 pt-3 mt-3'>
+                  <p className='text-gray-600 mb-2 font-medium'>Margins:</p>
+                  <div className='grid grid-cols-2 gap-2 text-xs'>
+                    <div>
+                      <span className='text-gray-600'>Left:</span>{' '}
+                      <span className='font-semibold text-purple-800'>
+                        {formatMeasurement(result.gridSpacing.leftMargin, unit)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className='text-gray-600'>Right:</span>{' '}
+                      <span className='font-semibold text-purple-800'>
+                        {formatMeasurement(
+                          result.gridSpacing.rightMargin,
+                          unit
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      <span className='text-gray-600'>Top:</span>{' '}
+                      <span className='font-semibold text-purple-800'>
+                        {formatMeasurement(result.gridSpacing.topMargin, unit)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className='text-gray-600'>Bottom:</span>{' '}
+                      <span className='font-semibold text-purple-800'>
+                        {formatMeasurement(
+                          result.gridSpacing.bottomMargin,
+                          unit
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Installation Steps */}
