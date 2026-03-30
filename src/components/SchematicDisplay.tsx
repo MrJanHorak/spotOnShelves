@@ -113,10 +113,10 @@ export function SchematicDisplay({
   const baseHeight = 350;
   const compactScale = 0.3;
   const containerWidth = Math.round(
-    isCompact ? baseWidth * compactScale : baseWidth
+    isCompact ? baseWidth * compactScale : baseWidth,
   );
   const containerHeight = Math.round(
-    isCompact ? baseHeight * compactScale : baseHeight
+    isCompact ? baseHeight * compactScale : baseHeight,
   );
 
   // Calculate wall scale: when using background photo, respect wallScaleFactor
@@ -124,7 +124,7 @@ export function SchematicDisplay({
   const autoFitScale =
     (Math.min(
       containerWidth / Math.max(wall.width, 1),
-      containerHeight / Math.max(wall.height, 1)
+      containerHeight / Math.max(wall.height, 1),
     ) *
       0.9) /
     (isCompact ? compactScale : 1);
@@ -140,8 +140,8 @@ export function SchematicDisplay({
   const defaultY = (baseHeight - scaledHeight) / 2;
 
   // Wall position: use saved alignment if using background photo, otherwise center
-  const wallX = useBackgroundPhoto ? wallAlignmentX ?? defaultX : defaultX;
-  const wallY = useBackgroundPhoto ? wallAlignmentY ?? defaultY : defaultY;
+  const wallX = useBackgroundPhoto ? (wallAlignmentX ?? defaultX) : defaultX;
+  const wallY = useBackgroundPhoto ? (wallAlignmentY ?? defaultY) : defaultY;
 
   // Apply compact scaling to positions for rendering
   const offsetX = wallX * (isCompact ? compactScale : 1);
@@ -206,7 +206,7 @@ export function SchematicDisplay({
     onWallAlignmentChange(
       wallAlignmentX ?? defaultX,
       wallAlignmentY ?? defaultY,
-      newScale
+      newScale,
     );
   };
 
@@ -458,7 +458,7 @@ export function SchematicDisplay({
                           [item],
                           (wallMaterial as WallMaterial) || 'drywall',
                           (mountingType as MountingType) || 'floating',
-                          { useStuds }
+                          { useStuds },
                         )
                       : null;
                   const itemCapacity =
@@ -483,6 +483,33 @@ export function SchematicDisplay({
                         return { fill: '#6B7280', stroke: '#4B5563' };
                     }
                   };
+
+                  // Get abbreviated label for item type with count
+                  const getItemTypeAbbrev = () => {
+                    switch (item.type) {
+                      case 'picture':
+                        return 'P';
+                      case 'poster':
+                        return 'Po';
+                      case 'mirror':
+                        return 'M';
+                      case 'tv':
+                        return 'T';
+                      case 'artpiece':
+                        return 'A';
+                      case 'shelf':
+                        return 'S';
+                      default:
+                        return '?';
+                    }
+                  };
+
+                  // Count items of same type that came before this one
+                  const sameTypeIndex =
+                    shelves.slice(0, index).filter((s) => s.type === item.type)
+                      .length + 1;
+
+                  const itemLabel = `${getItemTypeAbbrev()} ${sameTypeIndex}`;
 
                   const colors = getItemColor();
                   const itemHeight = item.height || 1;
@@ -543,7 +570,7 @@ export function SchematicDisplay({
                         fill='white'
                         dominantBaseline='middle'
                       >
-                        {item.type.toUpperCase()} {index + 1}
+                        {itemLabel}
                       </text>
 
                       {/* Weight/capacity badge */}
@@ -634,7 +661,7 @@ export function SchematicDisplay({
                               [item],
                               (wallMaterial as WallMaterial) || 'drywall',
                               (mountingType as MountingType) || 'floating',
-                              { useStuds }
+                              { useStuds },
                             ).perShelf || [];
                           const bracketsForThisShelf =
                             perShelf[0]?.brackets || 2;
@@ -937,7 +964,7 @@ export function SchematicDisplay({
                         ></div>
                         <span className='capitalize'>{type}</span>
                       </div>
-                    )
+                    ),
                   )}
                 </div>
               </div>

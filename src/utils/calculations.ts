@@ -10,7 +10,7 @@ import {
   WallMaterial,
   MaterialCalcOptions,
   PerShelfMaterial,
-  BaseItem,
+  // BaseItem,
   WallItem,
   ItemType,
   HardwareRecommendation,
@@ -20,7 +20,7 @@ import {
 // Helper function to check if two rectangles overlap
 function checkOverlap(
   rect1: { x: number; y: number; width: number; height: number },
-  rect2: { x: number; y: number; width: number; height: number }
+  rect2: { x: number; y: number; width: number; height: number },
 ): boolean {
   const horizontalOverlap = !(
     rect1.x + rect1.width <= rect2.x || rect2.x + rect2.width <= rect1.x
@@ -37,7 +37,7 @@ function checkOverlap(
 function calculateGridSpacingMetrics(
   wall: WallDimensions,
   placements: ShelfPlacement[],
-  items: WallItem[]
+  items: WallItem[],
 ) {
   if (placements.length === 0 || items.length === 0) return undefined;
 
@@ -48,10 +48,10 @@ function calculateGridSpacingMetrics(
   // Calculate margins and spacings
   const leftmost = Math.min(...placements.map((p) => p.distanceFromLeft));
   const rightmost = Math.max(
-    ...placements.map((p) => p.distanceFromLeft + p.width)
+    ...placements.map((p) => p.distanceFromLeft + p.width),
   );
   const topmost = Math.max(
-    ...placements.map((p) => p.distanceFromFloor + p.height)
+    ...placements.map((p) => p.distanceFromFloor + p.height),
   );
   const bottommost = Math.min(...placements.map((p) => p.distanceFromFloor));
 
@@ -114,7 +114,7 @@ function calculateGridSpacingMetrics(
 export function validateInputs(
   wall: WallDimensions,
   shelves: ShelfDimensions[],
-  obstructions: Obstruction[]
+  obstructions: Obstruction[],
 ): string[] {
   const errors: string[] = [];
 
@@ -137,12 +137,12 @@ export function validateInputs(
   obstructions.forEach((obstruction, index) => {
     if (obstruction.width <= 0 || obstruction.height <= 0) {
       errors.push(
-        `Obstruction ${index + 1} dimensions must be positive numbers`
+        `Obstruction ${index + 1} dimensions must be positive numbers`,
       );
     }
     if (obstruction.distanceFromLeft < 0 || obstruction.distanceFromFloor < 0) {
       errors.push(
-        `Obstruction ${index + 1} position values must be non-negative`
+        `Obstruction ${index + 1} position values must be non-negative`,
       );
     }
     if (obstruction.distanceFromLeft + obstruction.width > wall.width) {
@@ -169,7 +169,7 @@ export function validateInputs(
             y: obstructions[j].distanceFromFloor,
             width: obstructions[j].width,
             height: obstructions[j].height,
-          }
+          },
         )
       ) {
         const type1 =
@@ -191,7 +191,7 @@ export function calculateOptimalPlacement(
   shelves: ShelfDimensions[],
   obstructions: Obstruction[],
   alignment: Alignment = 'center',
-  studLocations?: number[]
+  studLocations?: number[],
 ): CalculationResult {
   if (shelves.length === 0) {
     return { shelves: [], measurements: [], instructions: [] };
@@ -326,7 +326,7 @@ export function calculateOptimalPlacement(
       type: 'shelf',
       distanceFromLeft: Math.max(
         wallMargin,
-        Math.min(adjustedX, wall.width - shelf.width - wallMargin)
+        Math.min(adjustedX, wall.width - shelf.width - wallMargin),
       ),
       distanceFromFloor: currentY,
       width: shelf.width,
@@ -360,9 +360,9 @@ export function calculateOptimalPlacement(
       ? ` (Expected weight: ${placement.expectedWeight} lbs)`
       : '';
     return `Shelf ${index + 1}: ${placement.distanceFromLeft.toFixed(
-      1
+      1,
     )} from left wall, ${placement.distanceFromFloor.toFixed(
-      1
+      1,
     )} from floor${weightInfo}`;
   });
 
@@ -377,11 +377,11 @@ export function calculateOptimalPlacement(
 
   // Add weight-specific instructions
   const heavyShelves = placements.filter(
-    (p) => p.expectedWeight && p.expectedWeight > 30
+    (p) => p.expectedWeight && p.expectedWeight > 30,
   );
   if (heavyShelves.length > 0) {
     instructions.push(
-      '⚠️  HEAVY LOAD: For shelves with expected weight >30 lbs, ensure brackets are mounted into studs for maximum safety'
+      '⚠️  HEAVY LOAD: For shelves with expected weight >30 lbs, ensure brackets are mounted into studs for maximum safety',
     );
   }
 
@@ -389,7 +389,7 @@ export function calculateOptimalPlacement(
     instructions.push(
       `📍 Stud locations detected at: ${studLocations
         .map((s) => s.toFixed(1) + '"')
-        .join(', ')}`
+        .join(', ')}`,
     );
   }
 
@@ -404,7 +404,7 @@ export function calculateOptimalPlacement(
 export function convertUnits(
   value: number,
   fromUnit: 'inches' | 'cm',
-  toUnit: 'inches' | 'cm'
+  toUnit: 'inches' | 'cm',
 ): number {
   if (fromUnit === toUnit) return value;
 
@@ -419,7 +419,7 @@ export function convertUnits(
 
 export function formatMeasurement(
   value: number,
-  unit: 'inches' | 'cm'
+  unit: 'inches' | 'cm',
 ): string {
   return `${value.toFixed(1)} ${unit === 'inches' ? 'in' : 'cm'}`;
 }
@@ -430,7 +430,7 @@ export function calculateLoadCapacity(
   mountingType: MountingType,
   bracketsCount: number,
   useStuds: boolean = false,
-  bracketSpacing?: number
+  bracketSpacing?: number,
 ): { maxWeight: number; safetyFactor: number; notes: string[] } {
   const notes: string[] = [];
 
@@ -447,7 +447,7 @@ export function calculateLoadCapacity(
       case 'bracketed':
         capacityPerBracket = 125;
         notes.push(
-          'Bracketed shelves in studs can support 125 lbs per bracket'
+          'Bracketed shelves in studs can support 125 lbs per bracket',
         );
         break;
       case 'l-bracket':
@@ -461,7 +461,7 @@ export function calculateLoadCapacity(
       case 'drywall':
         capacityPerBracket = mountingType === 'floating' ? 35 : 50;
         notes.push(
-          'Drywall anchors: use heavy-duty toggle bolts for best results'
+          'Drywall anchors: use heavy-duty toggle bolts for best results',
         );
         break;
       case 'plaster':
@@ -504,7 +504,7 @@ export function calculateLoadCapacity(
 export function calculateStudLocations(
   wallWidth: number,
   studSpacing: number = 16,
-  startOffset: number = 0
+  startOffset: number = 0,
 ): number[] {
   const studs: number[] = [];
   let position = startOffset;
@@ -520,7 +520,7 @@ export function calculateStudLocations(
 // Find nearest stud to a given position
 export function findNearestStud(
   position: number,
-  studLocations: number[]
+  studLocations: number[],
 ): { stud: number; distance: number } | null {
   if (studLocations.length === 0) return null;
 
@@ -543,7 +543,7 @@ export function calculateMaterials(
   shelves: ShelfDimensions[] | ShelfPlacement[],
   wallMaterial: WallMaterial,
   mountingType: MountingType,
-  options: MaterialCalcOptions = {}
+  options: MaterialCalcOptions = {},
 ): MaterialEstimate & { perShelf?: PerShelfMaterial[] } {
   // Determine brackets needed per shelf based on width and mounting style
   const bracketsForWidth = (width: number) => {
@@ -593,7 +593,7 @@ export function calculateMaterials(
       mountingType,
       b, // brackets for this shelf only
       options.useStuds || false,
-      bracketSpacing
+      bracketSpacing,
     );
 
     perShelf.push({
@@ -645,7 +645,7 @@ export function calculateMaterials(
 // Calculate eye-level height for pictures (57-60 inches is standard gallery height)
 export function calculateEyeLevelHeight(
   wallHeight: number,
-  itemHeight: number
+  itemHeight: number,
 ): number {
   // Standard gallery height is 57 inches to center of artwork
   const standardEyeLevel = 57;
@@ -668,7 +668,8 @@ export function calculateWallItemPlacement(
   autoArrange: boolean = true,
   minSpacing: number = 6,
   horizontalSpacing?: number,
-  verticalSpacing?: number
+  verticalSpacing?: number,
+  distributeEvenly: boolean = false,
 ): CalculationResult {
   if (items.length === 0) {
     return {
@@ -684,10 +685,10 @@ export function calculateWallItemPlacement(
 
   // Separate items with manual positions from auto-positioned items
   const manualItems = items.filter(
-    (item) => item.manualPosition && (item.locked || !autoArrange)
+    (item) => item.manualPosition && (item.locked || !autoArrange),
   );
   const autoItems = items.filter(
-    (item) => !item.manualPosition || (!item.locked && autoArrange)
+    (item) => !item.manualPosition || (!item.locked && autoArrange),
   );
 
   // First, place manually positioned items
@@ -725,10 +726,10 @@ export function calculateWallItemPlacement(
 
   // Separate shelves from wall items in auto items
   const shelves = autoItems.filter(
-    (item): item is ShelfDimensions => item.type === 'shelf'
+    (item): item is ShelfDimensions => item.type === 'shelf',
   );
   const wallItems = autoItems.filter(
-    (item): item is WallItem => item.type !== 'shelf'
+    (item): item is WallItem => item.type !== 'shelf',
   );
 
   // First, place shelves using existing logic
@@ -737,7 +738,7 @@ export function calculateWallItemPlacement(
       wall,
       shelves,
       obstructions,
-      alignment
+      alignment,
     );
     placements.push(...shelfResult.shelves);
   }
@@ -754,7 +755,8 @@ export function calculateWallItemPlacement(
       placements, // existing placements to avoid
       minSpacing,
       horizontalSpacing,
-      verticalSpacing
+      verticalSpacing,
+      distributeEvenly,
     );
     placements.push(...wallItemPlacements);
 
@@ -772,9 +774,9 @@ export function calculateWallItemPlacement(
       ? ` (Weight: ${placement.weight} lbs)`
       : '';
     return `${typeLabel} ${index + 1}: ${placement.distanceFromLeft.toFixed(
-      1
+      1,
     )}" from left, ${placement.distanceFromFloor.toFixed(
-      1
+      1,
     )}" from floor${weightInfo}`;
   });
 
@@ -787,7 +789,7 @@ export function calculateWallItemPlacement(
     gridSpacing = calculateGridSpacingMetrics(
       wall,
       placements.filter((p) => wallItems.some((w) => w.id === p.id)),
-      wallItems
+      wallItems,
     );
   }
 
@@ -801,6 +803,19 @@ export function calculateWallItemPlacement(
   };
 }
 
+// Get abbreviated item type label
+function getItemTypeAbbreviation(type: ItemType): string {
+  const abbreviations: Record<ItemType, string> = {
+    shelf: 'S',
+    picture: 'P',
+    poster: 'Po',
+    mirror: 'M',
+    tv: 'T',
+    artpiece: 'A',
+  };
+  return abbreviations[type] || '?';
+}
+
 // Apply different gallery layout patterns
 function applyGalleryLayout(
   wall: WallDimensions,
@@ -812,7 +827,8 @@ function applyGalleryLayout(
   existingPlacements: ShelfPlacement[],
   minSpacing: number = 6,
   horizontalSpacing?: number,
-  verticalSpacing?: number
+  verticalSpacing?: number,
+  distributeEvenly: boolean = false,
 ): ShelfPlacement[] {
   const margin = 4; // margin from wall edges
   // Use specific spacings if provided, otherwise fall back to minSpacing
@@ -829,7 +845,8 @@ function applyGalleryLayout(
         obstructions,
         existingPlacements,
         hSpacing,
-        vSpacing
+        vSpacing,
+        distributeEvenly,
       );
     case 'salon':
       return applySalonLayout(
@@ -838,7 +855,7 @@ function applyGalleryLayout(
         margin,
         eyeLevelHeight,
         obstructions,
-        existingPlacements
+        existingPlacements,
       );
     case 'linear':
       return applyLinearLayout(
@@ -849,7 +866,7 @@ function applyGalleryLayout(
         eyeLevelHeight,
         obstructions,
         existingPlacements,
-        minSpacing
+        minSpacing,
       );
     case 'custom':
     default:
@@ -860,7 +877,7 @@ function applyGalleryLayout(
         margin,
         eyeLevelHeight,
         obstructions,
-        existingPlacements
+        existingPlacements,
       );
   }
 }
@@ -874,7 +891,8 @@ function applyGridLayout(
   obstructions: Obstruction[],
   existingPlacements: ShelfPlacement[],
   horizontalSpacing: number = 6,
-  verticalSpacing: number = 6
+  verticalSpacing: number = 6,
+  distributeEvenly: boolean = false,
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
 
@@ -892,7 +910,7 @@ function applyGridLayout(
 
   // Start with the full wall width
   const sortedObs = [...obstructions].sort(
-    (a, b) => a.distanceFromLeft - b.distanceFromLeft
+    (a, b) => a.distanceFromLeft - b.distanceFromLeft,
   );
 
   let currentX = margin;
@@ -937,9 +955,29 @@ function applyGridLayout(
 
   // Calculate available width within the best zone
   const availableWidth = bestZone.end - bestZone.start;
+  const maxItemWidth = Math.max(...items.map((item) => item.width));
 
-  // Calculate cell width for this zone
-  const cellWidth = availableWidth / cols;
+  // Calculate cell width based on distribution mode
+  let cellWidth: number;
+  let gridStartX: number;
+
+  if (distributeEvenly) {
+    // Distribute items evenly across available space with EQUAL GAPS including edges
+    // Formula: margin_gap = item_gap = (availableWidth - cols*itemWidth) / (cols+1)
+    const totalItemWidth = cols * maxItemWidth;
+    const totalGapSpace = availableWidth - totalItemWidth;
+    const gapSize = totalGapSpace / (cols + 1);
+
+    // Position grid to start after first gap
+    gridStartX = bestZone.start + gapSize;
+
+    // Cell width includes the item plus the gap after it
+    cellWidth = maxItemWidth + gapSize;
+  } else {
+    // Original behavior: items centered in zone with standard spacing
+    cellWidth = availableWidth / cols;
+    gridStartX = bestZone.start;
+  }
 
   // Center the grid vertically around eye level
   const gridStartY = eyeLevelHeight - totalGridHeight / 2;
@@ -947,15 +985,17 @@ function applyGridLayout(
   // Ensure grid stays within bounds
   const finalStartY = Math.max(
     margin,
-    Math.min(gridStartY, wall.height - totalGridHeight - margin)
+    Math.min(gridStartY, wall.height - totalGridHeight - margin),
   );
 
   items.forEach((item, index) => {
     const col = index % cols;
     const row = Math.floor(index / cols);
 
-    // Horizontal positioning - evenly distributed within the selected zone
-    const x = bestZone.start + col * cellWidth + (cellWidth - item.width) / 2;
+    // Horizontal positioning - use calculated grid positioning
+    const x = distributeEvenly
+      ? gridStartX + col * cellWidth
+      : gridStartX + col * cellWidth + (cellWidth - item.width) / 2;
 
     // Vertical positioning - centered around eye level
     const y =
@@ -998,11 +1038,11 @@ function applyGridLayout(
       type: item.type,
       distanceFromLeft: Math.max(
         margin,
-        Math.min(finalX, wall.width - item.width - margin)
+        Math.min(finalX, wall.width - item.width - margin),
       ),
       distanceFromFloor: Math.max(
         margin,
-        Math.min(finalY, wall.height - item.height - margin)
+        Math.min(finalY, wall.height - item.height - margin),
       ),
       width: item.width,
       height: item.height,
@@ -1024,13 +1064,13 @@ function applySalonLayout(
   margin: number,
   eyeLevelHeight: number,
   obstructions: Obstruction[],
-  existingPlacements: ShelfPlacement[]
+  existingPlacements: ShelfPlacement[],
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
 
   // Sort by size (largest first)
   const sorted = [...items].sort(
-    (a, b) => b.width * b.height - a.width * a.height
+    (a, b) => b.width * b.height - a.width * a.height,
   );
 
   // Place largest item at eye level center
@@ -1067,11 +1107,11 @@ function applySalonLayout(
         type: item.type,
         distanceFromLeft: Math.max(
           margin,
-          Math.min(x, wall.width - item.width - margin)
+          Math.min(x, wall.width - item.width - margin),
         ),
         distanceFromFloor: Math.max(
           margin,
-          Math.min(y, wall.height - item.height - margin)
+          Math.min(y, wall.height - item.height - margin),
         ),
         width: item.width,
         height: item.height,
@@ -1096,7 +1136,7 @@ function applyLinearLayout(
   eyeLevelHeight: number,
   obstructions: Obstruction[],
   existingPlacements: ShelfPlacement[],
-  spacing: number = 6
+  spacing: number = 6,
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
 
@@ -1136,7 +1176,7 @@ function applyLinearLayout(
               y: placement.distanceFromFloor,
               width: placement.width,
               height: placement.height,
-            }
+            },
           )
         ) {
           needsAdjustment = true;
@@ -1157,7 +1197,7 @@ function applyLinearLayout(
               y: obstruction.distanceFromFloor,
               width: obstruction.width,
               height: obstruction.height,
-            }
+            },
           )
         ) {
           needsAdjustment = true;
@@ -1200,7 +1240,7 @@ function applyCustomLayout(
   margin: number,
   eyeLevelHeight: number,
   obstructions: Obstruction[],
-  existingPlacements: ShelfPlacement[]
+  existingPlacements: ShelfPlacement[],
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
   const minSpacing = 4; // minimum spacing between items
@@ -1210,7 +1250,7 @@ function applyCustomLayout(
     x: number,
     y: number,
     width: number,
-    height: number
+    height: number,
   ): boolean => {
     // Check against existing placements (shelves)
     for (const placement of existingPlacements) {
@@ -1222,7 +1262,7 @@ function applyCustomLayout(
             y: placement.distanceFromFloor,
             width: placement.width,
             height: placement.height,
-          }
+          },
         )
       ) {
         return true;
@@ -1239,7 +1279,7 @@ function applyCustomLayout(
             y: placement.distanceFromFloor,
             width: placement.width,
             height: placement.height,
-          }
+          },
         )
       ) {
         return true;
@@ -1256,7 +1296,7 @@ function applyCustomLayout(
             y: obstruction.distanceFromFloor,
             width: obstruction.width,
             height: obstruction.height,
-          }
+          },
         )
       ) {
         return true;
@@ -1335,7 +1375,7 @@ function applyCustomLayout(
 // Generate hardware recommendations based on item type and weight
 export function generateHardwareRecommendation(
   item: WallItem,
-  wallMaterial: WallMaterial
+  wallMaterial: WallMaterial,
 ): HardwareRecommendation {
   const weight = item.weight || estimateWeight(item);
   const notes: string[] = [];
@@ -1353,7 +1393,7 @@ export function generateHardwareRecommendation(
     quantity = 2;
     maxWeightCapacity = 8;
     notes.push(
-      "For lightweight items, adhesive strips work well and don't damage walls"
+      "For lightweight items, adhesive strips work well and don't damage walls",
     );
     notes.push('Use two strips or nails for better stability');
   } else if (weight <= 15) {
@@ -1380,7 +1420,7 @@ export function generateHardwareRecommendation(
     maxWeightCapacity = 75;
     notes.push('⚠️ HEAVY ITEM: Must mount into wall studs');
     notes.push(
-      'French cleats provide excellent stability for heavy mirrors/art'
+      'French cleats provide excellent stability for heavy mirrors/art',
     );
     notes.push('Use stud finder to locate studs before installation');
   } else {
@@ -1400,7 +1440,7 @@ export function generateHardwareRecommendation(
     notes.push('Consider safety backing film for large mirrors');
   } else if (item.type === 'tv') {
     notes.push(
-      'TV: Use TV-specific wall mount rated for your TV weight and size'
+      'TV: Use TV-specific wall mount rated for your TV weight and size',
     );
     notes.push('ALWAYS mount TV brackets into wall studs');
   } else if (item.type === 'artpiece' && item.isFramed) {
@@ -1465,57 +1505,79 @@ function getItemTypeLabel(type: ItemType): string {
 // Generate installation instructions based on item types
 function generateInstallationInstructions(
   items: (ShelfDimensions | WallItem)[],
-  galleryLayout?: GalleryLayout
+  galleryLayout?: GalleryLayout,
 ): string[] {
-  const hasShel = items.some((i) => i.type === 'shelf');
-  const hasPictures = items.some((i) => i.type !== 'shelf');
+  const hasShelf = items.some((i) => i.type === 'shelf');
+  const hasPictures = items.some((i) => i.type === 'picture');
+  const hasPoster = items.some((i) => i.type === 'poster');
+  const hasMirror = items.some((i) => i.type === 'mirror');
+  const hasTV = items.some((i) => i.type === 'tv');
+  const hasArtpiece = items.some((i) => i.type === 'artpiece');
+  const hasWallItems = items.some((i) => i.type !== 'shelf');
+
   const instructions: string[] = [];
 
-  if (hasPictures) {
+  if (hasWallItems) {
     instructions.push(
-      '1. Mark center points for each item using measurements provided'
+      '1. Mark center points for each item using measurements provided',
     );
     instructions.push('2. Use a level to ensure all items are straight');
-    instructions.push(
-      '3. For pictures: Standard eye level is 57" to center of artwork'
-    );
+    instructions.push('3. Standard eye level is 57" to center of artwork');
 
     if (galleryLayout === 'grid') {
       instructions.push(
-        '4. Grid layout: Measure spacing carefully for uniform appearance'
+        '4. Grid layout: Measure spacing carefully for uniform appearance',
       );
     } else if (galleryLayout === 'salon') {
       instructions.push(
-        '4. Salon layout: Start with largest piece at center, work outward'
+        '4. Salon layout: Start with largest piece at center, work outward',
       );
     } else if (galleryLayout === 'linear') {
       instructions.push(
-        '4. Linear layout: Ensure all items align at same height'
+        '4. Linear layout: Ensure all items align at same height',
       );
     }
 
+    const itemTypes: string[] = [];
+    if (hasPictures) itemTypes.push('Pictures');
+    if (hasPoster) itemTypes.push('Posters');
+    if (hasMirror) itemTypes.push('Mirrors');
+    if (hasTV) itemTypes.push('TVs');
+    if (hasArtpiece) itemTypes.push('Art Pieces');
+
     instructions.push(
-      '5. Install appropriate hardware based on weight (see recommendations)'
+      `5. Installing: ${itemTypes.join(', ')} - Use appropriate hardware based on weight`,
     );
     instructions.push(
-      '6. For items over 15 lbs, locate and use wall studs when possible'
+      '6. For items over 15 lbs, locate and use wall studs when possible',
     );
+
+    if (hasTV) {
+      instructions.push(
+        '   ⚠️  TVs: Use heavy-duty brackets mounted into studs',
+      );
+    }
+    if (hasMirror) {
+      instructions.push(
+        '   💧 Mirrors: Avoid moisture-prone areas; ensure secure mounting',
+      );
+    }
   }
 
-  if (hasShel) {
+  if (hasShelf) {
     instructions.push(
-      '• Shelves: Use stud finder and ensure brackets are level'
+      '• Shelves: Use stud finder and ensure brackets are level',
     );
     instructions.push(
-      '• Heavy shelves (>30 lbs expected load) must mount into studs'
+      '• Heavy shelves (>30 lbs expected load) must mount into studs',
     );
   }
 
   instructions.push(
-    '⚠️ Safety: Always use appropriate hardware for item weight'
+    '⚠️ Safety: Always use appropriate hardware for item weight',
   );
   instructions.push(
-    '📏 Tip: Create paper templates to visualize arrangement before drilling'
+    '📏 Tip: Create paper templates to visualize arrangement before drilling',
   );
 
   return instructions;
@@ -1524,7 +1586,7 @@ function generateInstallationInstructions(
 // Helper function to check for conflicts between placed items and obstructions
 export function checkItemObstructionConflicts(
   placements: ShelfPlacement[],
-  obstructions: Obstruction[]
+  obstructions: Obstruction[],
 ): string[] {
   const errors: string[] = [];
 
@@ -1545,7 +1607,7 @@ export function checkItemObstructionConflicts(
             y: placement.distanceFromFloor,
             width: placement.width,
             height: itemHeight,
-          }
+          },
         )
       ) {
         const obsType = obs.type.charAt(0).toUpperCase() + obs.type.slice(1);
@@ -1554,7 +1616,7 @@ export function checkItemObstructionConflicts(
         errors.push(
           `${obsType} ${obsIndex + 1} overlaps with ${itemType} ${
             placementIndex + 1
-          } - please reposition`
+          } - please reposition`,
         );
       }
     });
@@ -1565,7 +1627,7 @@ export function checkItemObstructionConflicts(
 
 // Helper function to check for conflicts between placed items themselves
 export function checkPlacedItemConflicts(
-  placements: ShelfPlacement[]
+  placements: ShelfPlacement[],
 ): string[] {
   const errors: string[] = [];
 
@@ -1589,7 +1651,7 @@ export function checkPlacedItemConflicts(
             y: item2.distanceFromFloor,
             width: item2.width,
             height: item2Height,
-          }
+          },
         )
       ) {
         const type1 = item1.type.charAt(0).toUpperCase() + item1.type.slice(1);
@@ -1597,7 +1659,7 @@ export function checkPlacedItemConflicts(
         errors.push(
           `${type1} ${i + 1} overlaps with ${type2} ${
             j + 1
-          } - please reposition or resize`
+          } - please reposition or resize`,
         );
       }
     }

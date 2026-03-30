@@ -90,7 +90,7 @@ export function InputSection({
   // Pointer handlers for dragging alignment handles on the displayed image
   const onAlignPointerDown = (
     e: React.PointerEvent<HTMLDivElement>,
-    idx: number
+    idx: number,
   ) => {
     e.currentTarget.setPointerCapture?.(e.pointerId);
     draggingHandleRef.current = idx;
@@ -151,7 +151,7 @@ export function InputSection({
   // Utility: solve 6x6 linear system for affine transform mapping srcTri -> dstTri
   const solveAffine = (
     src: { x: number; y: number }[],
-    dst: { x: number; y: number }[]
+    dst: { x: number; y: number }[],
   ) => {
     // Solve for a,b,c,d,e,f where x' = a*x + b*y + c; y' = d*x + e*y + f
     // Build matrix and solve using Cramer's rule / Gaussian elimination (6x6)
@@ -196,7 +196,7 @@ export function InputSection({
     ctx: CanvasRenderingContext2D,
     img: HTMLImageElement,
     srcTri: { x: number; y: number }[],
-    dstTri: { x: number; y: number }[]
+    dstTri: { x: number; y: number }[],
   ) => {
     // compute affine params
     const [a, b, c, d, e, f] = solveAffine(srcTri, dstTri);
@@ -220,7 +220,7 @@ export function InputSection({
     img: HTMLImageElement,
     srcPts: { x: number; y: number }[],
     tw: number,
-    th: number
+    th: number,
   ) => {
     const canvas = document.createElement('canvas');
     canvas.width = tw;
@@ -239,13 +239,13 @@ export function InputSection({
       ctx,
       img,
       [srcPts[0], srcPts[1], srcPts[2]],
-      [dst[0], dst[1], dst[2]]
+      [dst[0], dst[1], dst[2]],
     );
     drawTriangle(
       ctx,
       img,
       [srcPts[0], srcPts[2], srcPts[3]],
-      [dst[0], dst[2], dst[3]]
+      [dst[0], dst[2], dst[3]],
     );
     return canvas.toDataURL('image/jpeg', 0.86);
   };
@@ -265,9 +265,20 @@ export function InputSection({
     onShelvesChange(shelves.filter((shelf) => shelf.id !== id));
   };
 
+  const duplicateShelf = (id: string) => {
+    const shelfToDuplicate = shelves.find((shelf) => shelf.id === id);
+    if (!shelfToDuplicate) return;
+
+    const newShelf = {
+      ...shelfToDuplicate,
+      id: `shelf-${Date.now()}`,
+    };
+    onShelvesChange([...shelves, newShelf]);
+  };
+
   const updateShelf = (
     id: string,
-    updates: Partial<ShelfDimensions | WallItem>
+    updates: Partial<ShelfDimensions | WallItem>,
   ) => {
     onShelvesChange(
       shelves.map((shelf) => {
@@ -280,7 +291,7 @@ export function InputSection({
           }
         }
         return shelf;
-      })
+      }),
     );
   };
 
@@ -334,15 +345,15 @@ export function InputSection({
 
   const removeObstruction = (id: string) => {
     onObstructionsChange(
-      obstructions.filter((obstruction) => obstruction.id !== id)
+      obstructions.filter((obstruction) => obstruction.id !== id),
     );
   };
 
   const updateObstruction = (id: string, updates: Partial<Obstruction>) => {
     onObstructionsChange(
       obstructions.map((obstruction) =>
-        obstruction.id === id ? { ...obstruction, ...updates } : obstruction
-      )
+        obstruction.id === id ? { ...obstruction, ...updates } : obstruction,
+      ),
     );
   };
 
@@ -365,6 +376,7 @@ export function InputSection({
                 onSettingsChange({ ...settings, unit: e.target.value as Unit })
               }
               className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              aria-label='Units'
             >
               <option value='inches'>Inches</option>
               <option value='cm'>Centimeters</option>
@@ -383,6 +395,7 @@ export function InputSection({
                 })
               }
               className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              aria-label='Wall Material'
             >
               <option value='drywall'>Drywall</option>
               <option value='plaster'>Plaster</option>
@@ -403,6 +416,7 @@ export function InputSection({
                 })
               }
               className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              aria-label='Mounting Type'
             >
               <option value='floating'>Floating Shelf</option>
               <option value='bracketed'>Bracketed Shelf</option>
@@ -422,6 +436,7 @@ export function InputSection({
                 })
               }
               className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              aria-label='Alignment'
             >
               <option value='left'>Left Aligned</option>
               <option value='center'>Center Aligned</option>
@@ -437,7 +452,6 @@ export function InputSection({
               <input
                 type='file'
                 accept='image/*'
-                capture='environment'
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -458,6 +472,8 @@ export function InputSection({
                   }
                 }}
                 className='text-sm'
+                placeholder='Choose a background photo'
+                title='Upload a background photo of your wall'
               />
               {settings.backgroundImage && (
                 <button
@@ -516,6 +532,7 @@ export function InputSection({
                   })
                 }
                 className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                aria-label='Background Fit Mode'
               >
                 <option value='cover'>Cover (fill container)</option>
                 <option value='contain'>Contain (fit inside)</option>
@@ -698,6 +715,8 @@ export function InputSection({
                   className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                   min='0.25'
                   step='0.25'
+                  placeholder='Enter grid size'
+                  title='Grid Size'
                 />
               </div>
             )}
@@ -719,13 +738,15 @@ export function InputSection({
                   className='flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                   min='0'
                   step='0.5'
+                  placeholder='Enter minimum spacing'
+                  title='Minimum spacing between items'
                 />
                 {settings.galleryLayout === 'grid' &&
                   shelves.some((item) => item.type !== 'shelf') && (
                     <button
                       onClick={() => {
                         const wallItems = shelves.filter(
-                          (item) => item.type !== 'shelf'
+                          (item) => item.type !== 'shelf',
                         );
                         if (wallItems.length === 0) return;
 
@@ -735,15 +756,15 @@ export function InputSection({
 
                         // Get max item dimensions
                         const maxWidth = Math.max(
-                          ...wallItems.map((item) => item.width)
+                          ...wallItems.map((item) => item.width),
                         );
                         const maxHeight = Math.max(
-                          ...wallItems.map((item) => item.height)
+                          ...wallItems.map((item) => item.height),
                         );
 
                         // Find available horizontal space considering obstructions
                         const sortedObs = [...obstructions].sort(
-                          (a, b) => a.distanceFromLeft - b.distanceFromLeft
+                          (a, b) => a.distanceFromLeft - b.distanceFromLeft,
                         );
 
                         const horizontalZones: Array<{
@@ -764,7 +785,7 @@ export function InputSection({
                           // Move past this obstruction
                           currentX = Math.max(
                             currentX,
-                            obs.distanceFromLeft + obs.width + margin
+                            obs.distanceFromLeft + obs.width + margin,
                           );
                         }
 
@@ -816,7 +837,7 @@ export function InputSection({
                         // Use the smaller of the two to maintain proportional spacing
                         const optimalSpacing = Math.max(
                           0,
-                          Math.min(horizontalSpacing, verticalSpacing)
+                          Math.min(horizontalSpacing, verticalSpacing),
                         );
 
                         onSettingsChange({
@@ -849,11 +870,9 @@ export function InputSection({
                     <input
                       type='checkbox'
                       id='separate-spacing'
-                      checked={
-                        !!(
-                          settings.horizontalSpacing || settings.verticalSpacing
-                        )
-                      }
+                      checked={Boolean(
+                        settings.horizontalSpacing || settings.verticalSpacing,
+                      )}
                       onChange={(e) => {
                         if (e.target.checked) {
                           onSettingsChange({
@@ -862,7 +881,6 @@ export function InputSection({
                             verticalSpacing: settings.minSpacing ?? 6,
                           });
                         } else {
-                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
                           const {
                             horizontalSpacing,
                             verticalSpacing,
@@ -901,6 +919,8 @@ export function InputSection({
                           className='w-full px-2 py-1 text-sm border border-purple-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent'
                           min='0'
                           step='0.5'
+                          placeholder='Enter horizontal gap'
+                          title='Horizontal Gap'
                         />
                       </div>
                       <div>
@@ -928,6 +948,67 @@ export function InputSection({
                     Enable to independently adjust horizontal and vertical
                     spacing between items
                   </p>
+                </div>
+              )}
+
+            {/* Grid Distribution Mode */}
+            {settings.galleryLayout === 'grid' &&
+              shelves.some((item) => item.type !== 'shelf') && (
+                <div className='mt-4 p-3 bg-white rounded border border-green-200'>
+                  <label className='block text-sm font-medium text-gray-700 mb-3'>
+                    Grid Distribution
+                  </label>
+                  <div className='space-y-2'>
+                    <div className='flex items-start'>
+                      <input
+                        type='radio'
+                        id='dist-centered'
+                        name='grid-distribution'
+                        checked={!(settings.gridDistributeEvenly ?? false)}
+                        onChange={() =>
+                          onSettingsChange({
+                            ...settings,
+                            gridDistributeEvenly: false,
+                          })
+                        }
+                        className='h-4 w-4 text-green-600 mt-0.5'
+                      />
+                      <label
+                        htmlFor='dist-centered'
+                        className='ml-2 text-sm text-gray-700'
+                      >
+                        <span className='font-medium'>📍 Centered</span>
+                        <span className='text-xs text-gray-600 block'>
+                          Grid centered on wall (larger margins on left/right
+                          edges)
+                        </span>
+                      </label>
+                    </div>
+                    <div className='flex items-start'>
+                      <input
+                        type='radio'
+                        id='dist-even'
+                        name='grid-distribution'
+                        checked={settings.gridDistributeEvenly ?? false}
+                        onChange={() =>
+                          onSettingsChange({
+                            ...settings,
+                            gridDistributeEvenly: true,
+                          })
+                        }
+                        className='h-4 w-4 text-green-600 mt-0.5'
+                      />
+                      <label
+                        htmlFor='dist-even'
+                        className='ml-2 text-sm text-gray-700'
+                      >
+                        <span className='font-medium'>📊 Distributed</span>
+                        <span className='text-xs text-gray-600 block'>
+                          Items spread evenly across wall width with equal gaps
+                        </span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               )}
           </div>
@@ -972,6 +1053,8 @@ export function InputSection({
                     })
                   }
                   className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  aria-label='Standard Stud Spacing'
+                  title='Standard Stud Spacing'
                 >
                   <option value='16'>16" on center (standard)</option>
                   <option value='24'>24" on center</option>
@@ -1058,15 +1141,13 @@ export function InputSection({
 
       {/* Items Section (Shelves and Wall Items) */}
       <div>
-        <div className='flex items-center justify-between mb-4'>
+        <div className='mb-4'>
           <h3 className='text-xl font-semibold text-gray-900'>Items to Hang</h3>
-          <button
-            onClick={addShelf}
-            className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-          >
-            <Plus className='h-4 w-4' />
-            Add Item
-          </button>
+          {shelves.length > 0 && (
+            <p className='text-sm text-gray-600 mt-1'>
+              {shelves.length} item{shelves.length !== 1 ? 's' : ''} added
+            </p>
+          )}
         </div>
         <div className='space-y-4'>
           {shelves.map((item, index) => (
@@ -1079,12 +1160,34 @@ export function InputSection({
                   {item.type.charAt(0).toUpperCase() + item.type.slice(1)}{' '}
                   {index + 1}
                 </h4>
-                <button
-                  onClick={() => removeShelf(item.id)}
-                  className='text-red-600 hover:text-red-800 transition-colors'
-                >
-                  <X className='h-4 w-4' />
-                </button>
+                <div className='flex items-center gap-2'>
+                  <button
+                    onClick={() => duplicateShelf(item.id)}
+                    className='text-blue-600 hover:text-blue-800 transition-colors p-2 rounded hover:bg-blue-50'
+                    title='Duplicate this item with same settings'
+                  >
+                    <svg
+                      className='h-4 w-4'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => removeShelf(item.id)}
+                    className='text-red-600 hover:text-red-800 transition-colors p-2 rounded hover:bg-red-50'
+                    title='Remove this item'
+                  >
+                    <X className='h-4 w-4' />
+                  </button>
+                </div>
               </div>
 
               {/* Item Type Selector */}
@@ -1256,7 +1359,7 @@ export function InputSection({
                               expectedWeight:
                                 parseFloat(e.target.value) || undefined,
                             }
-                          : { weight: parseFloat(e.target.value) || undefined }
+                          : { weight: parseFloat(e.target.value) || undefined },
                       )
                     }
                     className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
@@ -1287,6 +1390,8 @@ export function InputSection({
                           })
                         }
                         className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        aria-label='Hanging Method'
+                        title='Hanging Method'
                       >
                         {item.type === 'tv' ? (
                           <>
@@ -1399,6 +1504,15 @@ export function InputSection({
           )}
         </div>
 
+        {/* Add Item Button - Positioned at Bottom */}
+        <button
+          onClick={addShelf}
+          className='mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium'
+        >
+          <Plus className='h-5 w-5' />
+          Add Item
+        </button>
+
         {/* Gallery Layout Settings */}
         {shelves.some((item) => item.type !== 'shelf') && (
           <div className='mt-6 p-4 bg-purple-50 rounded-lg'>
@@ -1414,6 +1528,8 @@ export function InputSection({
                 })
               }
               className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              aria-label='Gallery Layout Pattern'
+              title='Gallery Layout Pattern'
             >
               <option value='custom'>Custom (User Positioned)</option>
               <option value='grid'>Grid Layout</option>
@@ -1460,6 +1576,7 @@ export function InputSection({
                 }
                 className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                 placeholder='Standard is 57"'
+                title='Set the eye level height (center of artwork)'
                 min='40'
                 max='72'
                 step='1'
@@ -1598,6 +1715,8 @@ export function InputSection({
                     className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                     min='0'
                     step='0.1'
+                    placeholder='Enter distance from floor'
+                    title='Distance from floor'
                   />
                 </div>
               </div>

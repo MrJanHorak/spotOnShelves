@@ -15,6 +15,7 @@ import { InputSection } from './components/InputSection';
 import { SchematicDisplay } from './components/SchematicDisplay';
 import { MeasurementOutput } from './components/MeasurementOutput';
 import { ToolsAndGuidance } from './components/ToolsAndGuidance';
+import TermsOfService from './components/TermsOfService';
 import {
   WallDimensions,
   ShelfDimensions,
@@ -79,6 +80,7 @@ function App() {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [isSchematicCompact, setIsSchematicCompact] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   // Load saved projects on mount
   useEffect(() => {
@@ -104,7 +106,7 @@ function App() {
         root: rootEl,
         rootMargin: '-135px 0px 0px 0px',
         threshold: 0.75,
-      }
+      },
     );
 
     observer.observe(sentinelEl);
@@ -114,7 +116,7 @@ function App() {
   useEffect(() => {
     // Split items into shelves and wall items for validation
     const shelvesOnly = shelves.filter(
-      (item): item is ShelfDimensions => item.type === 'shelf'
+      (item): item is ShelfDimensions => item.type === 'shelf',
     );
     const validationErrors = validateInputs(wall, shelvesOnly, obstructions);
 
@@ -127,7 +129,7 @@ function App() {
           : calculateStudLocations(
               wall.width,
               settings.studSpacing || 16,
-              settings.studSpacing || 16
+              settings.studSpacing || 16,
             )
         : undefined;
 
@@ -147,7 +149,7 @@ function App() {
           settings.autoArrange ?? true,
           settings.minSpacing ?? 6,
           settings.horizontalSpacing,
-          settings.verticalSpacing
+          settings.verticalSpacing,
         );
       } else {
         // Use the original shelf-only calculation
@@ -156,7 +158,7 @@ function App() {
           shelvesOnly,
           obstructions,
           settings.alignment,
-          studLocs
+          studLocs,
         );
       }
 
@@ -164,13 +166,13 @@ function App() {
       if (calculationResult.shelves.length > 0) {
         const conflictErrors = checkItemObstructionConflicts(
           calculationResult.shelves,
-          obstructions
+          obstructions,
         );
         validationErrors.push(...conflictErrors);
 
         // Also check for item-to-item conflicts
         const itemConflictErrors = checkPlacedItemConflicts(
-          calculationResult.shelves
+          calculationResult.shelves,
         );
         validationErrors.push(...itemConflictErrors);
       }
@@ -245,7 +247,7 @@ function App() {
         wall,
         shelves,
         obstructions,
-        settings
+        settings,
       );
       exportProjectAsJSON(temp);
       deleteProject(temp.id);
@@ -538,7 +540,7 @@ function App() {
                         selectedShelfId={selectedShelfId}
                         onSelectShelf={(id) =>
                           setSelectedShelfId((prev) =>
-                            prev === id ? null : id
+                            prev === id ? null : id,
                           )
                         }
                         onHoverShelf={(id) => setHoveredShelfId(id)}
@@ -624,23 +626,104 @@ function App() {
       )}
 
       {/* Footer */}
-      <footer className='bg-gray-900 text-white mt-16'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-          <div className='text-center'>
+      <footer className='bg-gray-900 text-white mt-16 border-t border-gray-800'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row items-center justify-between gap-6'>
+          <div className='text-center md:text-left flex-1'>
+            <div className='flex items-center justify-center md:justify-start gap-4 mb-3'>
+              <a
+                href='https://github.com/MrJanHorak'
+                target='_blank'
+                rel='noopener noreferrer'
+                aria-label='GitHub profile'
+                className='hover:text-blue-400 transition-colors flex items-center gap-1'
+              >
+                <svg
+                  className='inline h-5 w-5'
+                  fill='currentColor'
+                  viewBox='0 0 24 24'
+                  aria-hidden='true'
+                >
+                  <path d='M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.207 11.387.6.113.793-.262.793-.583 0-.288-.012-1.243-.017-2.252-3.338.726-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.73.083-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.606-2.665-.304-5.466-1.332-5.466-5.93 0-1.31.468-2.38 1.236-3.22-.124-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.3 1.23a11.5 11.5 0 0 1 3.003-.404c1.02.005 2.047.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.12 3.176.77.84 1.235 1.91 1.235 3.22 0 4.61-2.804 5.624-5.475 5.921.43.37.823 1.102.823 2.222 0 1.606-.015 2.902-.015 3.297 0 .324.192.7.8.581C20.565 21.796 24 17.297 24 12c0-6.63-5.37-12-12-12z' />
+                </svg>
+                <span className='text-sm font-medium'>GitHub</span>
+              </a>
+              <a
+                href='https://www.linkedin.com/in/jan-horak/'
+                target='_blank'
+                rel='noopener noreferrer'
+                aria-label='LinkedIn profile'
+                className='hover:text-blue-400 transition-colors flex items-center gap-1'
+              >
+                <svg
+                  className='inline h-5 w-5'
+                  fill='currentColor'
+                  viewBox='0 0 24 24'
+                  aria-hidden='true'
+                >
+                  <path d='M19 0h-14c-2.76 0-5 2.24-5 5v14c0 2.76 2.24 5 5 5h14c2.76 0 5-2.24 5-5v-14c0-2.76-2.24-5-5-5zm-11 19h-3v-10h3v10zm-1.5-11.28c-.97 0-1.75-.79-1.75-1.75s.78-1.75 1.75-1.75 1.75.79 1.75 1.75-.78 1.75-1.75 1.75zm15.5 11.28h-3v-5.6c0-1.34-.03-3.07-1.87-3.07-1.87 0-2.16 1.46-2.16 2.97v5.7h-3v-10h2.88v1.36h.04c.4-.75 1.38-1.54 2.84-1.54 3.04 0 3.6 2 3.6 4.59v5.59z' />
+                </svg>
+                <span className='text-sm font-medium'>LinkedIn</span>
+              </a>
+            </div>
             <p className='text-gray-400 text-sm'>
-              Spot On Shelves - Your trusted companion for precise shelf
-              installation
+              Spot On Shelves &copy; {new Date().getFullYear()} — All rights
+              reserved.
             </p>
             <p className='text-gray-500 text-xs mt-2'>
-              Always prioritize safety and consult professionals for complex
-              installations
+              This site is provided for informational purposes only. Always
+              prioritize safety and consult professionals for complex
+              installations.
             </p>
             <p className='text-gray-500 text-xs mt-2'>
-              Built with <a href='https://bolt.new/'>bolt.new</a>
+              Built with{' '}
+              <a
+                href='https://bolt.new/'
+                className='underline hover:text-blue-300'
+              >
+                bolt.new
+              </a>
+            </p>
+          </div>
+          <div className='mt-6 md:mt-0 text-center md:text-right flex-1'>
+            <p className='text-gray-400 text-xs mb-2 font-semibold tracking-wide uppercase'>
+              Legal & Privacy
+            </p>
+            <p className='text-gray-500 text-xs'>
+              This site does not collect personal data except for project data
+              you choose to save locally in your browser. No data is transmitted
+              to external servers.
+            </p>
+            <p className='text-gray-500 text-xs mt-2'>
+              By using this site, you agree to the{' '}
+              <button
+                type='button'
+                className='underline hover:text-blue-300 bg-transparent border-0 p-0 m-0 cursor-pointer inline'
+                onClick={() => setShowTerms(true)}
+                aria-label='View Terms of Service'
+              >
+                Terms of Service
+              </button>
+              .
             </p>
           </div>
         </div>
       </footer>
+
+      {/* Terms of Service Modal */}
+      {showTerms && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 relative animate-fadeInUp'>
+            <button
+              onClick={() => setShowTerms(false)}
+              className='absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold focus:outline-none'
+              aria-label='Close Terms of Service'
+            >
+              &times;
+            </button>
+            <TermsOfService />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -126,6 +126,7 @@ export interface ProjectSettings {
   minSpacing?: number; // minimum spacing between items in inches
   horizontalSpacing?: number; // horizontal spacing between items (overrides minSpacing for horizontal)
   verticalSpacing?: number; // vertical spacing between items (overrides minSpacing for vertical)
+  gridDistributeEvenly?: boolean; // distribute grid items evenly across wall width
   // Optional background/photo used behind the wall schematic.
   // Stored as a data URL (compressed) for project persistence.
   backgroundImage?: string;
