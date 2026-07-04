@@ -1,4 +1,5 @@
-import { calculateMaterials } from '../calculations';
+import { calculateLoadCapacity, calculateMaterials, calculateWallItemPlacement } from '../calculations';
+import { describe, test, expect } from 'vitest';
 
 describe('calculateMaterials', () => {
   test('calculates basic counts for floating shelves on drywall', () => {
@@ -21,5 +22,63 @@ describe('calculateMaterials', () => {
       useStuds: true,
     } as any);
     expect(result.anchors).toBe(0);
+  });
+});
+
+describe('calculateLoadCapacity', () => {
+  test('applies 30% spacing reduction when bracket spacing exceeds 48 inches', () => {
+    const wideSpacing = calculateLoadCapacity(
+      'drywall',
+      'l-bracket',
+      2,
+      false,
+      40,
+    );
+    const veryWideSpacing = calculateLoadCapacity(
+      'drywall',
+      'l-bracket',
+      2,
+      false,
+      50,
+    );
+
+    expect(veryWideSpacing.notes).toContain(
+      'Very wide bracket spacing (>48") reduces capacity by 30%',
+    );
+    expect(wideSpacing.maxWeight).toBe(63);
+    expect(veryWideSpacing.maxWeight).toBe(52);
+  });
+});
+
+describe('calculateWallItemPlacement', () => {
+  test('uses selected wall material for hardware recommendations', () => {
+    const result = calculateWallItemPlacement(
+      { width: 120, height: 96 },
+      [
+        {
+          id: 'mirror-1',
+          type: 'mirror',
+          width: 30,
+          height: 40,
+          weight: 20,
+        },
+      ],
+      [],
+      'center',
+      'custom',
+      57,
+      true,
+      6,
+      undefined,
+      undefined,
+      false,
+      'concrete',
+    );
+
+    const recommendation = result.hardwareRecommendations?.[0];
+    expect(recommendation?.anchorType).toBe('Masonry anchors or concrete screws');
+    expect(recommendation?.notes).toContain(
+      'Concrete: use a hammer drill and masonry bit',
+    );
   });
 });

@@ -481,12 +481,12 @@ export function calculateLoadCapacity(
 
   // Adjust for bracket spacing (wider spacing reduces overall capacity)
   let spacingFactor = 1.0;
-  if (bracketSpacing && bracketSpacing > 32) {
-    spacingFactor = 0.85; // reduce capacity by 15% for wide spacing
-    notes.push('Wide bracket spacing (>32") reduces overall capacity by 15%');
-  } else if (bracketSpacing && bracketSpacing > 48) {
+  if (bracketSpacing && bracketSpacing > 48) {
     spacingFactor = 0.7; // reduce capacity by 30% for very wide spacing
     notes.push('Very wide bracket spacing (>48") reduces capacity by 30%');
+  } else if (bracketSpacing && bracketSpacing > 32) {
+    spacingFactor = 0.85; // reduce capacity by 15% for wide spacing
+    notes.push('Wide bracket spacing (>32") reduces overall capacity by 15%');
   }
 
   // Calculate total capacity with safety factor
@@ -670,6 +670,7 @@ export function calculateWallItemPlacement(
   horizontalSpacing?: number,
   verticalSpacing?: number,
   distributeEvenly: boolean = false,
+  wallMaterial: WallMaterial = 'drywall',
 ): CalculationResult {
   if (items.length === 0) {
     return {
@@ -762,7 +763,7 @@ export function calculateWallItemPlacement(
 
     // Generate hardware recommendations for each wall item
     wallItems.forEach((item) => {
-      const recommendation = generateHardwareRecommendation(item, 'drywall');
+      const recommendation = generateHardwareRecommendation(item, wallMaterial);
       hardwareRecommendations.push(recommendation);
     });
   }
@@ -1454,6 +1455,38 @@ export function generateHardwareRecommendation(
     notes.push('French cleat: Ensures level hanging and easy removal');
   } else if (item.hangingMethod === 'd-ring') {
     notes.push('D-rings: Use two rings for balanced hanging');
+  }
+
+  if (wallMaterial === 'plaster') {
+    anchorType =
+      weight > 30
+        ? 'Heavy-duty molly bolts or toggle anchors into lath/studs'
+        : 'Molly bolts or toggle anchors rated for plaster';
+    notes.push('Plaster: pre-drill carefully to avoid cracking the surface');
+  } else if (wallMaterial === 'concrete') {
+    anchorType =
+      weight > 30
+        ? 'Heavy-duty masonry anchors or sleeve anchors'
+        : 'Masonry anchors or concrete screws';
+    screwSize = weight > 30 ? '3" masonry screws or lag screws' : screwSize;
+    notes.push('Concrete: use a hammer drill and masonry bit');
+    notes.push('Concrete walls do not use wood studs like drywall framing');
+  } else if (wallMaterial === 'brick') {
+    anchorType =
+      weight > 30
+        ? 'Heavy-duty brick anchors or sleeve anchors'
+        : 'Brick anchors or masonry screws';
+    screwSize = weight > 30 ? '3" masonry screws or lag screws' : screwSize;
+    notes.push('Brick: drill into the brick body, not mortar joints');
+    notes.push('Use masonry anchors rated for solid brick');
+  }
+
+  if (wallMaterial === 'concrete' || wallMaterial === 'brick') {
+    const filteredNotes = notes.filter(
+      (note) => !note.toLowerCase().includes('stud'),
+    );
+    notes.length = 0;
+    notes.push(...filteredNotes);
   }
 
   return {

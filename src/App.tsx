@@ -35,6 +35,7 @@ import {
 import { MaterialCalculator } from './components/MaterialCalculator';
 import {
   saveProject,
+  updateProject,
   getAllProjects,
   getProject,
   deleteProject,
@@ -150,6 +151,8 @@ function App() {
           settings.minSpacing ?? 6,
           settings.horizontalSpacing,
           settings.verticalSpacing,
+          settings.gridDistributeEvenly ?? false,
+          settings.wallMaterial,
         );
       } else {
         // Use the original shelf-only calculation
@@ -197,16 +200,45 @@ function App() {
     settings.minSpacing,
     settings.horizontalSpacing,
     settings.verticalSpacing,
+    settings.gridDistributeEvenly,
+    settings.wallMaterial,
   ]);
 
   const handleSaveProject = () => {
     const name = prompt('Enter project name:', currentProjectName);
-    if (name) {
-      const project = saveProject(name, wall, shelves, obstructions, settings);
-      setCurrentProjectId(project.id);
-      setCurrentProjectName(name);
-      setSavedProjects(getAllProjects());
-      alert('Project saved successfully!');
+    const trimmedName = name?.trim();
+    if (trimmedName) {
+      try {
+        let project: SavedProject | null = null;
+        if (currentProjectId) {
+          project = updateProject(currentProjectId, {
+            name: trimmedName,
+            wall,
+            shelves,
+            obstructions,
+            settings,
+          });
+        }
+        if (!project) {
+          project = saveProject(
+            trimmedName,
+            wall,
+            shelves,
+            obstructions,
+            settings,
+          );
+        }
+
+        setCurrentProjectId(project.id);
+        setCurrentProjectName(trimmedName);
+        setSavedProjects(getAllProjects());
+        alert('Project saved successfully!');
+      } catch (error) {
+        console.error('Failed to save project:', error);
+        alert(
+          'Failed to save project. Local storage may be full (try removing large background photos).',
+        );
+      }
     }
   };
 
@@ -241,16 +273,23 @@ function App() {
         exportProjectAsJSON(project);
       }
     } else {
-      // Create temporary project for export
-      const temp = saveProject(
-        currentProjectName,
-        wall,
-        shelves,
-        obstructions,
-        settings,
-      );
-      exportProjectAsJSON(temp);
-      deleteProject(temp.id);
+      try {
+        // Create temporary project for export
+        const temp = saveProject(
+          currentProjectName,
+          wall,
+          shelves,
+          obstructions,
+          settings,
+        );
+        exportProjectAsJSON(temp);
+        deleteProject(temp.id);
+      } catch (error) {
+        console.error('Failed to export project:', error);
+        alert(
+          'Failed to export project. Please save without a large background image and try again.',
+        );
+      }
     }
   };
 
@@ -264,13 +303,20 @@ function App() {
         const reader = new FileReader();
         reader.onload = (event) => {
           const content = event.target?.result as string;
-          const project = importProjectFromJSON(content);
-          if (project) {
-            setSavedProjects(getAllProjects());
-            handleLoadProject(project.id);
-            alert('Project imported successfully!');
-          } else {
-            alert('Failed to import project. Please check the file format.');
+          try {
+            const project = importProjectFromJSON(content);
+            if (project) {
+              setSavedProjects(getAllProjects());
+              handleLoadProject(project.id);
+              alert('Project imported successfully!');
+            } else {
+              alert('Failed to import project. Please check the file format.');
+            }
+          } catch (error) {
+            console.error('Failed to import project:', error);
+            alert(
+              'Failed to import project. Local storage may be full or unavailable.',
+            );
           }
         };
         reader.readAsText(file);
@@ -389,7 +435,7 @@ function App() {
                       <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
                         <div
                           className={`flex border-b border-gray-200 bg-gray-50 ${
-                            isSchematicCompact ? 'mt-6=-2px' : ''
+                            isSchematicCompact ? 'mt-6 -mt-[2px]' : ''
                           }`}
                         >
                           <button
