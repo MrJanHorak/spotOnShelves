@@ -10,6 +10,7 @@ import {
   Ruler,
   Hammer,
   BookOpen,
+  HelpCircle,
 } from 'lucide-react';
 import { InputSection } from './components/InputSection';
 import { SchematicDisplay } from './components/SchematicDisplay';
@@ -23,6 +24,8 @@ import {
   ProjectSettings,
   CalculationResult,
   WallItem,
+  ObstructionStandard,
+  Unit,
 } from './types';
 import {
   validateInputs,
@@ -31,6 +34,7 @@ import {
   calculateWallItemPlacement,
   checkItemObstructionConflicts,
   checkPlacedItemConflicts,
+  convertUnits,
 } from './utils/calculations';
 import { MaterialCalculator } from './components/MaterialCalculator';
 import {
@@ -44,21 +48,69 @@ import {
   SavedProject,
 } from './utils/storage';
 
+function detectObstructionStandardFromBrowser(): ObstructionStandard {
+  if (typeof navigator === 'undefined') return 'us';
+
+  const localeCandidates = [
+    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+    navigator.language,
+    Intl.DateTimeFormat().resolvedOptions().locale,
+  ].filter(Boolean) as string[];
+
+  for (const locale of localeCandidates) {
+    const match = locale.match(/[-_]([A-Za-z]{2})\b/);
+    const region = match?.[1]?.toUpperCase();
+    if (!region) continue;
+    if (region === 'US' || region === 'CA') return 'us';
+    if (region === 'GB' || region === 'UK' || region === 'IE') return 'uk';
+    if (region === 'AU' || region === 'NZ') return 'au-nz';
+    if (region === 'JP') return 'jp';
+    return 'eu';
+  }
+
+  return 'us';
+}
+
+function getDefaultUnitForStandard(standard: ObstructionStandard): Unit {
+  if (standard === 'us') return 'inches';
+  return 'cm';
+}
+
+function toUnitValue(valueInches: number, unit: Unit): number {
+  if (unit === 'cm') return Math.round(valueInches * 2.54 * 10) / 10;
+  return valueInches;
+}
+
 function App() {
-  const [wall, setWall] = useState<WallDimensions>({ width: 96, height: 96 });
+  const detectedStandard = detectObstructionStandardFromBrowser();
+  const defaultUnit = getDefaultUnitForStandard(detectedStandard);
+  const [wall, setWall] = useState<WallDimensions>({
+    width: toUnitValue(96, defaultUnit),
+    height: toUnitValue(96, defaultUnit),
+  });
   const [shelves, setShelves] = useState<(ShelfDimensions | WallItem)[]>([
-    { id: 'shelf-1', type: 'shelf', width: 36, height: 1, depth: 8 },
+    {
+      id: 'shelf-1',
+      type: 'shelf',
+      width: toUnitValue(36, defaultUnit),
+      height: toUnitValue(1, defaultUnit),
+      depth: toUnitValue(8, defaultUnit),
+    },
   ]);
   const [obstructions, setObstructions] = useState<Obstruction[]>([]);
   const [settings, setSettings] = useState<ProjectSettings>({
-    unit: 'inches',
+    unit: defaultUnit,
     wallMaterial: 'drywall',
     mountingType: 'floating',
     alignment: 'center',
+    obstructionStandard: detectedStandard,
+    autoUnitByStandard: true,
+    studSpacing: toUnitValue(16, defaultUnit),
+    firstStudOffset: toUnitValue(16, defaultUnit),
     autoArrange: true,
     snapToGrid: true,
-    gridSize: 1,
-    minSpacing: 2,
+    gridSize: toUnitValue(1, defaultUnit),
+    minSpacing: toUnitValue(2, defaultUnit),
   });
 
   const [errors, setErrors] = useState<string[]>([]);
@@ -79,9 +131,145 @@ function App() {
     'setup' | 'measurements' | 'materials' | 'guidance'
   >('setup');
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTopRef = useRef(0);
+  const compactLockUntilRef = useRef(0);
   const [isSchematicCompact, setIsSchematicCompact] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
+  const [showQuickStart, setShowQuickStart] = useState(true);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveProjectNameDraft, setSaveProjectNameDraft] = useState('');
+  const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<
+    string | null
+  >(null);
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const hasUtilityObstruction = obstructions.some((o) =>
+    ['outlet', 'switch', 'plumbing'].includes(o.type),
+  );
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
+  const convertDimension = (value: number, from: Unit, to: Unit): number =>
+    Math.round(convertUnits(value, from, to) * 10) / 10;
+
+  const convertProjectMeasurements = (from: Unit, to: Unit) => {
+    setWall((prev) => ({
+      width: convertDimension(prev.width, from, to),
+      height: convertDimension(prev.height, from, to),
+    }));
+
+    setShelves((prev) =>
+      prev.map((item) => {
+        const baseItem = {
+          ...item,
+          width: convertDimension(item.width, from, to),
+          height: convertDimension(item.height, from, to),
+          manualPosition: item.manualPosition
+            ? {
+                distanceFromLeft: convertDimension(
+                  item.manualPosition.distanceFromLeft,
+                  from,
+                  to,
+                ),
+                distanceFromFloor: convertDimension(
+                  item.manualPosition.distanceFromFloor,
+                  from,
+                  to,
+                ),
+              }
+            : undefined,
+        };
+
+        if (item.type === 'shelf') {
+          return {
+            ...baseItem,
+            depth: convertDimension(item.depth, from, to),
+          } as ShelfDimensions;
+        }
+
+        return {
+          ...baseItem,
+          frameDepth:
+            typeof item.frameDepth === 'number'
+              ? convertDimension(item.frameDepth, from, to)
+              : item.frameDepth,
+        } as WallItem;
+      }),
+    );
+
+    setObstructions((prev) =>
+      prev.map((obstruction) => ({
+        ...obstruction,
+        width: convertDimension(obstruction.width, from, to),
+        height: convertDimension(obstruction.height, from, to),
+        distanceFromLeft: convertDimension(
+          obstruction.distanceFromLeft,
+          from,
+          to,
+        ),
+        distanceFromFloor: convertDimension(
+          obstruction.distanceFromFloor,
+          from,
+          to,
+        ),
+      })),
+    );
+  };
+
+  const convertSettingsMeasurements = (
+    nextSettings: ProjectSettings,
+    from: Unit,
+    to: Unit,
+  ): ProjectSettings => ({
+    ...nextSettings,
+    studSpacing:
+      typeof nextSettings.studSpacing === 'number'
+        ? convertDimension(nextSettings.studSpacing, from, to)
+        : nextSettings.studSpacing,
+    firstStudOffset:
+      typeof nextSettings.firstStudOffset === 'number'
+        ? convertDimension(nextSettings.firstStudOffset, from, to)
+        : nextSettings.firstStudOffset,
+    customStudLocations: nextSettings.customStudLocations?.map((value) =>
+      convertDimension(value, from, to),
+    ),
+    eyeLevelHeight:
+      typeof nextSettings.eyeLevelHeight === 'number'
+        ? convertDimension(nextSettings.eyeLevelHeight, from, to)
+        : nextSettings.eyeLevelHeight,
+    gridSize:
+      typeof nextSettings.gridSize === 'number'
+        ? convertDimension(nextSettings.gridSize, from, to)
+        : nextSettings.gridSize,
+    minSpacing:
+      typeof nextSettings.minSpacing === 'number'
+        ? convertDimension(nextSettings.minSpacing, from, to)
+        : nextSettings.minSpacing,
+    horizontalSpacing:
+      typeof nextSettings.horizontalSpacing === 'number'
+        ? convertDimension(nextSettings.horizontalSpacing, from, to)
+        : nextSettings.horizontalSpacing,
+    verticalSpacing:
+      typeof nextSettings.verticalSpacing === 'number'
+        ? convertDimension(nextSettings.verticalSpacing, from, to)
+        : nextSettings.verticalSpacing,
+  });
+
+  const handleSettingsChange = (nextSettings: ProjectSettings) => {
+    const from = settings.unit;
+    const to = nextSettings.unit;
+    if (from !== to) {
+      convertProjectMeasurements(from, to);
+      setSettings(convertSettingsMeasurements(nextSettings, from, to));
+      return;
+    }
+    setSettings(nextSettings);
+  };
 
   // Load saved projects on mount
   useEffect(() => {
@@ -89,29 +277,57 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
     if (result.shelves.length === 0) {
       setIsSchematicCompact(false);
-    }
-
-    const rootEl = scrollContainerRef.current;
-    const sentinelEl = sentinelRef.current;
-    if (!rootEl || !sentinelEl) {
+      lastScrollTopRef.current = 0;
+      compactLockUntilRef.current = 0;
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsSchematicCompact(!entry.isIntersecting);
-      },
-      {
-        root: rootEl,
-        rootMargin: '-135px 0px 0px 0px',
-        threshold: 0.75,
-      },
-    );
+    const rootEl = scrollContainerRef.current;
+    if (!rootEl) {
+      return;
+    }
 
-    observer.observe(sentinelEl);
-    return () => observer.disconnect();
+    const ENTER_COMPACT_SCROLL_TOP = 240;
+    const EXIT_COMPACT_SCROLL_TOP = 24;
+    const TOGGLE_LOCK_MS = 450;
+
+    const updateCompactMode = () => {
+      const now = performance.now();
+      if (now < compactLockUntilRef.current) return;
+
+      const scrollTop = rootEl.scrollTop;
+      const isScrollingDown = scrollTop > lastScrollTopRef.current;
+      const isScrollingUp = scrollTop < lastScrollTopRef.current;
+      lastScrollTopRef.current = scrollTop;
+
+      setIsSchematicCompact((prev) => {
+        if (!prev && isScrollingDown && scrollTop > ENTER_COMPACT_SCROLL_TOP) {
+          compactLockUntilRef.current = now + TOGGLE_LOCK_MS;
+          return true;
+        }
+        if (prev && isScrollingUp && scrollTop < EXIT_COMPACT_SCROLL_TOP) {
+          compactLockUntilRef.current = now + TOGGLE_LOCK_MS;
+          return false;
+        }
+        return prev;
+      });
+    };
+
+    lastScrollTopRef.current = rootEl.scrollTop;
+    updateCompactMode();
+    rootEl.addEventListener('scroll', updateCompactMode, { passive: true });
+
+    return () => {
+      rootEl.removeEventListener('scroll', updateCompactMode);
+    };
   }, [result.shelves.length]);
 
   useEffect(() => {
@@ -130,7 +346,7 @@ function App() {
           : calculateStudLocations(
               wall.width,
               settings.studSpacing || 16,
-              settings.studSpacing || 16,
+              settings.firstStudOffset ?? settings.studSpacing ?? 16,
             )
         : undefined;
 
@@ -146,7 +362,7 @@ function App() {
           obstructions,
           settings.alignment,
           settings.galleryLayout || 'custom',
-          settings.eyeLevelHeight || 57,
+          settings.eyeLevelHeight ?? (settings.unit === 'cm' ? 144.8 : 57),
           settings.autoArrange ?? true,
           settings.minSpacing ?? 6,
           settings.horizontalSpacing,
@@ -193,6 +409,7 @@ function App() {
     settings.alignment,
     settings.enableStudDetection,
     settings.studSpacing,
+    settings.firstStudOffset,
     settings.customStudLocations,
     settings.galleryLayout,
     settings.eyeLevelHeight,
@@ -204,9 +421,8 @@ function App() {
     settings.wallMaterial,
   ]);
 
-  const handleSaveProject = () => {
-    const name = prompt('Enter project name:', currentProjectName);
-    const trimmedName = name?.trim();
+  const saveProjectWithName = (name: string) => {
+    const trimmedName = name.trim();
     if (trimmedName) {
       try {
         let project: SavedProject | null = null;
@@ -232,14 +448,21 @@ function App() {
         setCurrentProjectId(project.id);
         setCurrentProjectName(trimmedName);
         setSavedProjects(getAllProjects());
-        alert('Project saved successfully!');
+        showToast('Project saved successfully.', 'success');
+        setShowSaveDialog(false);
       } catch (error) {
         console.error('Failed to save project:', error);
-        alert(
+        showToast(
           'Failed to save project. Local storage may be full (try removing large background photos).',
+          'error',
         );
       }
     }
+  };
+
+  const handleSaveProject = () => {
+    setSaveProjectNameDraft(currentProjectName);
+    setShowSaveDialog(true);
   };
 
   const handleLoadProject = (projectId: string) => {
@@ -248,7 +471,18 @@ function App() {
       setWall(project.wall);
       setShelves(project.shelves);
       setObstructions(project.obstructions);
-      setSettings(project.settings);
+      const resolvedStandard =
+        project.settings.obstructionStandard ??
+        detectObstructionStandardFromBrowser();
+      const autoUnitByStandard = project.settings.autoUnitByStandard ?? true;
+      const resolvedUnit =
+        project.settings.unit ?? getDefaultUnitForStandard(resolvedStandard);
+      setSettings({
+        ...project.settings,
+        obstructionStandard: resolvedStandard,
+        autoUnitByStandard,
+        unit: resolvedUnit,
+      });
       setCurrentProjectId(project.id);
       setCurrentProjectName(project.name);
       setShowLoadDialog(false);
@@ -256,14 +490,19 @@ function App() {
   };
 
   const handleDeleteProject = (projectId: string) => {
-    if (confirm('Are you sure you want to delete this project?')) {
-      deleteProject(projectId);
-      setSavedProjects(getAllProjects());
-      if (currentProjectId === projectId) {
-        setCurrentProjectId(null);
-        setCurrentProjectName('Untitled Project');
-      }
+    setPendingDeleteProjectId(projectId);
+  };
+
+  const confirmDeleteProject = () => {
+    if (!pendingDeleteProjectId) return;
+    deleteProject(pendingDeleteProjectId);
+    setSavedProjects(getAllProjects());
+    if (currentProjectId === pendingDeleteProjectId) {
+      setCurrentProjectId(null);
+      setCurrentProjectName('Untitled Project');
     }
+    setPendingDeleteProjectId(null);
+    showToast('Project deleted.', 'success');
   };
 
   const handleExportProject = () => {
@@ -271,6 +510,7 @@ function App() {
       const project = getProject(currentProjectId);
       if (project) {
         exportProjectAsJSON(project);
+        showToast('Project exported as JSON.', 'success');
       }
     } else {
       try {
@@ -284,10 +524,12 @@ function App() {
         );
         exportProjectAsJSON(temp);
         deleteProject(temp.id);
+        showToast('Project exported as JSON.', 'success');
       } catch (error) {
         console.error('Failed to export project:', error);
-        alert(
+        showToast(
           'Failed to export project. Please save without a large background image and try again.',
+          'error',
         );
       }
     }
@@ -308,14 +550,18 @@ function App() {
             if (project) {
               setSavedProjects(getAllProjects());
               handleLoadProject(project.id);
-              alert('Project imported successfully!');
+              showToast('Project imported successfully.', 'success');
             } else {
-              alert('Failed to import project. Please check the file format.');
+              showToast(
+                'Failed to import project. Please check the file format.',
+                'error',
+              );
             }
           } catch (error) {
             console.error('Failed to import project:', error);
-            alert(
+            showToast(
               'Failed to import project. Local storage may be full or unavailable.',
+              'error',
             );
           }
         };
@@ -329,25 +575,30 @@ function App() {
     <div className='min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50'>
       {/* Header */}
       <header className='bg-white shadow-sm border-b border-gray-200'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
-          <div className='flex items-center justify-between gap-3'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3'>
+          <div className='flex items-center justify-between gap-3 flex-wrap'>
             <div className='flex items-center gap-3'>
-              <div className='p-2 bg-blue-600 rounded-lg'>
-                <Calculator className='h-8 w-8 text-white' />
+              <div className='p-1.5 bg-blue-600 rounded-lg'>
+                <Calculator className='h-6 w-6 text-white' />
               </div>
               <div>
-                <h1 className='text-3xl font-bold text-gray-900'>
+                <h1 className='text-2xl font-bold text-gray-900 leading-tight'>
                   Spot On Shelves
                 </h1>
-                <p className='text-gray-600'>
+                <p className='text-sm text-gray-600 hidden lg:block'>
                   Plan and hang shelves with precision and confidence
                 </p>
               </div>
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2 flex-wrap justify-end'>
+              {currentProjectName && (
+                <span className='max-w-[220px] truncate px-2.5 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-700'>
+                  Project: {currentProjectName}
+                </span>
+              )}
               <button
                 onClick={handleSaveProject}
-                className='flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
+                className='flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
                 title='Save current project'
               >
                 <Save className='h-4 w-4' />
@@ -355,7 +606,7 @@ function App() {
               </button>
               <button
                 onClick={() => setShowLoadDialog(true)}
-                className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+                className='flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
                 title='Load saved project'
               >
                 <FolderOpen className='h-4 w-4' />
@@ -363,7 +614,7 @@ function App() {
               </button>
               <button
                 onClick={handleExportProject}
-                className='flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors'
+                className='flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors'
                 title='Export project as JSON'
               >
                 <Download className='h-4 w-4' />
@@ -371,7 +622,7 @@ function App() {
               </button>
               <button
                 onClick={handleImportProject}
-                className='flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors'
+                className='flex items-center gap-2 px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors'
                 title='Import project from JSON'
               >
                 <Upload className='h-4 w-4' />
@@ -379,16 +630,10 @@ function App() {
               </button>
             </div>
           </div>
-          {currentProjectName && (
-            <div className='mt-2 text-sm text-gray-600'>
-              Current project:{' '}
-              <span className='font-semibold'>{currentProjectName}</span>
-            </div>
-          )}
         </div>
       </header>
 
-      <main className='flex flex-col h-[calc(100vh-9rem)]'>
+      <main className='flex flex-col h-[calc(100vh-7.5rem)]'>
         <div ref={scrollContainerRef} className='flex-1 overflow-y-auto'>
           <div className='min-h-full pb-16'>
             {result.shelves.length > 0 && (
@@ -412,6 +657,7 @@ function App() {
                       selectedShelfId={hoveredShelfId || selectedShelfId}
                       onHoverShelf={(id) => setHoveredShelfId(id)}
                       studSpacing={settings.studSpacing}
+                      firstStudOffset={settings.firstStudOffset}
                       customStudLocations={settings.customStudLocations}
                       enableStudDetection={settings.enableStudDetection}
                       backgroundImage={settings.backgroundImage}
@@ -493,15 +739,28 @@ function App() {
                     </div>
                   </div>
                 </section>
-                <div
-                  ref={sentinelRef}
-                  aria-hidden='true'
-                  className='h-px w-full'
-                />
               </>
             )}
 
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+              {showQuickStart && (
+                <div className='mb-6 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start justify-between gap-3'>
+                  <p className='text-sm text-blue-900'>
+                    <strong>Quick start:</strong> 1) Set wall size and material
+                    2) Add shelves/items and obstructions 3) Use Measurements
+                    for your marking guide.
+                  </p>
+                  <button
+                    type='button'
+                    onClick={() => setShowQuickStart(false)}
+                    className='text-blue-700 hover:text-blue-900 text-sm font-medium'
+                    aria-label='Dismiss quick start'
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {/* Error Display */}
               {errors.length > 0 && (
                 <div className='mb-8 bg-red-50 border border-red-200 rounded-xl p-4'>
@@ -546,6 +805,16 @@ function App() {
                 </div>
               )}
 
+              {errors.length === 0 && !hasUtilityObstruction && (
+                <div className='mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4'>
+                  <p className='text-sm text-amber-900'>
+                    <strong>Safety reminder:</strong> No outlet/switch/plumbing
+                    zones are marked yet. Add them as obstructions before
+                    drilling.
+                  </p>
+                </div>
+              )}
+
               {/* Tabbed Interface (headers are in the sticky schematic) */}
               <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
                 {/* Tab Content */}
@@ -559,7 +828,7 @@ function App() {
                       onWallChange={setWall}
                       onShelvesChange={setShelves}
                       onObstructionsChange={setObstructions}
-                      onSettingsChange={setSettings}
+                      onSettingsChange={handleSettingsChange}
                     />
                   )}
 
@@ -712,8 +981,7 @@ function App() {
               </a>
             </div>
             <p className='text-gray-400 text-sm'>
-              Spot On Shelves &copy; {new Date().getFullYear()} — All rights
-              reserved.
+              Spot On Shelves &copy; {new Date().getFullYear()}.
             </p>
             <p className='text-gray-500 text-xs mt-2'>
               This site is provided for informational purposes only. Always
@@ -770,6 +1038,166 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Help Guide Modal */}
+      {showHelpGuide && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto'>
+            <div className='p-6 border-b flex items-center justify-between'>
+              <h2 className='text-xl font-bold text-gray-900'>
+                How to Use Spot On Shelves
+              </h2>
+              <button
+                onClick={() => setShowHelpGuide(false)}
+                className='text-gray-500 hover:text-gray-700 text-2xl font-bold'
+                aria-label='Close help guide'
+              >
+                &times;
+              </button>
+            </div>
+            <div className='p-6 space-y-4 text-sm text-gray-700'>
+              <p className='text-gray-800'>
+                <strong>First-time setup checklist</strong>
+              </p>
+              <ol className='list-decimal pl-5 space-y-3'>
+                <li>
+                  <strong>Start in Setup & Configuration.</strong> Choose units,
+                  wall material, mounting type, and alignment. If your wall
+                  includes outlets/switches/plumbing, select the obstruction
+                  standard closest to your region.
+                </li>
+                <li>
+                  <strong>Enter accurate wall size.</strong> Measure total wall
+                  width and height first; everything else is positioned against
+                  these values.
+                </li>
+                <li>
+                  <strong>Add your items.</strong> Add shelves and/or wall art.
+                  For best recommendations, enter each item&apos;s real weight
+                  when known. If you leave weight blank, the app estimates it.
+                </li>
+                <li>
+                  <strong>Mark obstructions before drilling.</strong> Add doors,
+                  windows, beds, cabinets, and utility zones (outlets/switches/
+                  plumbing). This prevents invalid placements and improves safety.
+                </li>
+                <li>
+                  <strong>Check the schematic and warnings.</strong> If you see
+                  overlap warnings, adjust size/position or use manual
+                  positioning until conflicts are gone.
+                </li>
+                <li>
+                  <strong>Use Measurements tab to mark the wall.</strong> Follow
+                  it top-to-bottom: left offset, floor offset, then bracket
+                  spacing/positions.
+                </li>
+                <li>
+                  <strong>Use Materials & Export for install prep.</strong>
+                  Review capacity/hardware guidance, then export the PDF plan or
+                  drilling templates.
+                </li>
+              </ol>
+              <div className='rounded-lg bg-blue-50 border border-blue-200 p-3 text-blue-900'>
+                <strong>Pro tip:</strong> Background photo tools are optional.
+                Leave that section collapsed unless you want visual alignment
+                against a real wall photo.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Project Dialog */}
+      {showSaveDialog && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full'>
+            <div className='p-6 border-b'>
+              <h2 className='text-xl font-bold text-gray-900'>Save Project</h2>
+            </div>
+            <div className='p-6'>
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
+                Project name
+              </label>
+              <input
+                type='text'
+                value={saveProjectNameDraft}
+                onChange={(e) => setSaveProjectNameDraft(e.target.value)}
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent'
+                placeholder='Enter project name'
+                autoFocus
+              />
+            </div>
+            <div className='p-6 border-t bg-gray-50 flex gap-3'>
+              <button
+                onClick={() => setShowSaveDialog(false)}
+                className='flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveProjectWithName(saveProjectNameDraft)}
+                className='flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Project Confirmation */}
+      {pendingDeleteProjectId && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full'>
+            <div className='p-6 border-b'>
+              <h2 className='text-xl font-bold text-gray-900'>
+                Delete Project?
+              </h2>
+            </div>
+            <div className='p-6 text-sm text-gray-700'>
+              This action cannot be undone.
+            </div>
+            <div className='p-6 border-t bg-gray-50 flex gap-3'>
+              <button
+                onClick={() => setPendingDeleteProjectId(null)}
+                className='flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteProject}
+                className='flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className='fixed bottom-20 right-4 z-50'>
+          <div
+            className={`px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white ${
+              toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Help Button */}
+      <button
+        type='button'
+        onClick={() => setShowHelpGuide(true)}
+        className='fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 flex items-center justify-center'
+        aria-label='Open how-to guide'
+        title='How to use this app'
+      >
+        <HelpCircle className='h-6 w-6' />
+      </button>
     </div>
   );
 }

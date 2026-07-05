@@ -270,9 +270,20 @@ export function MeasurementOutput({
                         rec.itemType.slice(1)}{' '}
                       #{index + 1}
                     </h4>
-                    <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800'>
-                      {rec.weight} lbs
-                    </span>
+                    <div className='flex items-center gap-2'>
+                      {rec.isEstimatedWeight ? (
+                        <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800'>
+                          Estimated
+                        </span>
+                      ) : (
+                        <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800'>
+                          User entered
+                        </span>
+                      )}
+                      <span className='inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800'>
+                        {rec.weight} lbs
+                      </span>
+                    </div>
                   </div>
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-3 mb-3'>
                     <div>

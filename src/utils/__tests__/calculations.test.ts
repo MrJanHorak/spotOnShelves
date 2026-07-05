@@ -1,5 +1,6 @@
 import { calculateLoadCapacity, calculateMaterials, calculateWallItemPlacement } from '../calculations';
 import { describe, test, expect } from 'vitest';
+import type { MaterialCalcOptions } from '../../types';
 
 describe('calculateMaterials', () => {
   test('calculates basic counts for floating shelves on drywall', () => {
@@ -18,9 +19,10 @@ describe('calculateMaterials', () => {
 
   test('useStuds option removes anchors', () => {
     const shelves = [{ id: 's1', width: 48, depth: 8 }];
+    const options: MaterialCalcOptions = { useStuds: true };
     const result = calculateMaterials(shelves, 'drywall', 'bracketed', {
-      useStuds: true,
-    } as any);
+      ...options,
+    });
     expect(result.anchors).toBe(0);
   });
 });
@@ -80,5 +82,28 @@ describe('calculateWallItemPlacement', () => {
     expect(recommendation?.notes).toContain(
       'Concrete: use a hammer drill and masonry bit',
     );
+  });
+
+  test('marks recommendations as estimated when item weight is omitted', () => {
+    const result = calculateWallItemPlacement(
+      { width: 120, height: 96 },
+      [
+        {
+          id: 'poster-1',
+          type: 'poster',
+          width: 24,
+          height: 36,
+        },
+      ],
+      [],
+      'center',
+      'custom',
+      57,
+      true,
+      6,
+    );
+
+    const recommendation = result.hardwareRecommendations?.[0];
+    expect(recommendation?.isEstimatedWeight).toBe(true);
   });
 });

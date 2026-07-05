@@ -9,12 +9,14 @@ A comprehensive web application for planning and installing wall shelves with pr
 - Support for both inches and centimeters
 - Automatic spacing optimization between multiple shelves
 - Collision detection with wall obstructions
+- US/EU/UK/AU-NZ/JP obstruction presets for typical sizes and placement heights
 
 ### 🏗️ Visual Planning
 - Interactive wall schematic with proportional scaling
 - Real-time visualization of shelves and obstructions
 - Color-coded legend for different obstruction types
 - Grid overlay for easy reference
+- Estimated stud-position overlay with configurable spacing and first-stud offset
 
 ### 🔧 Installation Guidance
 - Customized tool recommendations based on wall material
@@ -22,6 +24,7 @@ A comprehensive web application for planning and installing wall shelves with pr
 - Safety guidelines and best practices
 - Weight capacity recommendations
 - Stud finding guidance
+- Weight badges that distinguish user-entered vs estimated item weights
 
 ### 🎨 Smart Alignment Options
 - **Left Aligned**: Shelves aligned to the left side of the wall
@@ -200,12 +203,13 @@ Potential areas for expansion:
 
 ## 📄 License
 
-This project is built with [bolt.new](https://bolt.new/) and follows their terms of service.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## ⚠️ Disclaimer
 
 This tool provides calculations and guidance for shelf installation. Always:
 - Verify measurements before drilling
+- Mark and verify electrical, switch, and plumbing zones before drilling
 - Consult professionals for complex installations
 - Follow local building codes and regulations
 - Use appropriate safety equipment

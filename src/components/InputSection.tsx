@@ -1,5 +1,5 @@
 import { Plus, X, Home } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   WallDimensions,
   ShelfDimensions,
@@ -10,6 +10,7 @@ import {
   WallMaterial,
   MountingType,
   Alignment,
+  ObstructionStandard,
   WallItem,
   ItemType,
   HangingMethod,
@@ -36,8 +37,321 @@ const obstructionTypes: { value: ObstructionType; label: string }[] = [
   { value: 'door', label: 'Door' },
   { value: 'window', label: 'Window' },
   { value: 'tv', label: 'TV' },
+  { value: 'outlet', label: 'Outlet' },
+  { value: 'switch', label: 'Light Switch' },
+  { value: 'plumbing', label: 'Plumbing Zone' },
   { value: 'other', label: 'Other' },
 ];
+
+const getObstructionStandardLabel = (
+  standard: ObstructionStandard,
+): string => {
+  const labels: Record<ObstructionStandard, string> = {
+    us: 'US',
+    eu: 'EU',
+    uk: 'UK',
+    'au-nz': 'AU/NZ',
+    jp: 'JP',
+  };
+  return labels[standard];
+};
+
+const getDefaultUnitForStandard = (standard: ObstructionStandard): Unit => {
+  return standard === 'us' ? 'inches' : 'cm';
+};
+
+type ObstructionPreset = {
+  widthIn: number;
+  heightIn: number;
+  distanceFromLeftIn: number;
+  distanceFromFloorIn: number;
+};
+
+const obstructionPresets: Record<
+  ObstructionStandard,
+  Record<ObstructionType, ObstructionPreset>
+> = {
+  us: {
+    bed: {
+      widthIn: 60,
+      heightIn: 50,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    cabinet: {
+      widthIn: 30,
+      heightIn: 36,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 36,
+    },
+    door: {
+      widthIn: 36,
+      heightIn: 80,
+      distanceFromLeftIn: 4,
+      distanceFromFloorIn: 0,
+    },
+    window: {
+      widthIn: 36,
+      heightIn: 48,
+      distanceFromLeftIn: 24,
+      distanceFromFloorIn: 36,
+    },
+    tv: {
+      widthIn: 55,
+      heightIn: 32,
+      distanceFromLeftIn: 20,
+      distanceFromFloorIn: 30,
+    },
+    outlet: {
+      widthIn: 2.75,
+      heightIn: 4.5,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 12,
+    },
+    switch: {
+      widthIn: 2.75,
+      heightIn: 4.5,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 48,
+    },
+    plumbing: {
+      widthIn: 16,
+      heightIn: 24,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    other: {
+      widthIn: 24,
+      heightIn: 24,
+      distanceFromLeftIn: 0,
+      distanceFromFloorIn: 0,
+    },
+  },
+  eu: {
+    bed: {
+      widthIn: 63,
+      heightIn: 47,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    cabinet: {
+      widthIn: 31.5,
+      heightIn: 27.6,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 35.4,
+    },
+    door: {
+      widthIn: 35.4,
+      heightIn: 82.7,
+      distanceFromLeftIn: 4,
+      distanceFromFloorIn: 0,
+    },
+    window: {
+      widthIn: 47.2,
+      heightIn: 47.2,
+      distanceFromLeftIn: 24,
+      distanceFromFloorIn: 35.4,
+    },
+    tv: {
+      widthIn: 55,
+      heightIn: 32,
+      distanceFromLeftIn: 20,
+      distanceFromFloorIn: 30,
+    },
+    outlet: {
+      widthIn: 3.15,
+      heightIn: 3.15,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 11.8,
+    },
+    switch: {
+      widthIn: 3.15,
+      heightIn: 3.15,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 41.3,
+    },
+    plumbing: {
+      widthIn: 15.7,
+      heightIn: 23.6,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    other: {
+      widthIn: 24,
+      heightIn: 24,
+      distanceFromLeftIn: 0,
+      distanceFromFloorIn: 0,
+    },
+  },
+  uk: {
+    bed: {
+      widthIn: 60,
+      heightIn: 47,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    cabinet: {
+      widthIn: 31.5,
+      heightIn: 28,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 35,
+    },
+    door: {
+      widthIn: 33,
+      heightIn: 78,
+      distanceFromLeftIn: 4,
+      distanceFromFloorIn: 0,
+    },
+    window: {
+      widthIn: 47,
+      heightIn: 47,
+      distanceFromLeftIn: 24,
+      distanceFromFloorIn: 35,
+    },
+    tv: {
+      widthIn: 55,
+      heightIn: 32,
+      distanceFromLeftIn: 20,
+      distanceFromFloorIn: 30,
+    },
+    outlet: {
+      widthIn: 3.4,
+      heightIn: 3.4,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 17.7,
+    },
+    switch: {
+      widthIn: 3.4,
+      heightIn: 3.4,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 47.2,
+    },
+    plumbing: {
+      widthIn: 16,
+      heightIn: 24,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    other: {
+      widthIn: 24,
+      heightIn: 24,
+      distanceFromLeftIn: 0,
+      distanceFromFloorIn: 0,
+    },
+  },
+  'au-nz': {
+    bed: {
+      widthIn: 60,
+      heightIn: 47,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    cabinet: {
+      widthIn: 31.5,
+      heightIn: 28,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 35,
+    },
+    door: {
+      widthIn: 32,
+      heightIn: 80.7,
+      distanceFromLeftIn: 4,
+      distanceFromFloorIn: 0,
+    },
+    window: {
+      widthIn: 47,
+      heightIn: 47,
+      distanceFromLeftIn: 24,
+      distanceFromFloorIn: 35,
+    },
+    tv: {
+      widthIn: 55,
+      heightIn: 32,
+      distanceFromLeftIn: 20,
+      distanceFromFloorIn: 30,
+    },
+    outlet: {
+      widthIn: 3.5,
+      heightIn: 4.7,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 11.8,
+    },
+    switch: {
+      widthIn: 3.5,
+      heightIn: 4.7,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 43.3,
+    },
+    plumbing: {
+      widthIn: 16,
+      heightIn: 24,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    other: {
+      widthIn: 24,
+      heightIn: 24,
+      distanceFromLeftIn: 0,
+      distanceFromFloorIn: 0,
+    },
+  },
+  jp: {
+    bed: {
+      widthIn: 55,
+      heightIn: 45,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    cabinet: {
+      widthIn: 30,
+      heightIn: 26,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 34,
+    },
+    door: {
+      widthIn: 31.5,
+      heightIn: 78.7,
+      distanceFromLeftIn: 4,
+      distanceFromFloorIn: 0,
+    },
+    window: {
+      widthIn: 36,
+      heightIn: 47,
+      distanceFromLeftIn: 24,
+      distanceFromFloorIn: 35,
+    },
+    tv: {
+      widthIn: 50,
+      heightIn: 29,
+      distanceFromLeftIn: 20,
+      distanceFromFloorIn: 30,
+    },
+    outlet: {
+      widthIn: 2.8,
+      heightIn: 4.7,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 11.8,
+    },
+    switch: {
+      widthIn: 2.8,
+      heightIn: 4.7,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 43.3,
+    },
+    plumbing: {
+      widthIn: 16,
+      heightIn: 24,
+      distanceFromLeftIn: 12,
+      distanceFromFloorIn: 0,
+    },
+    other: {
+      widthIn: 24,
+      heightIn: 24,
+      distanceFromLeftIn: 0,
+      distanceFromFloorIn: 0,
+    },
+  },
+};
 
 export function InputSection({
   wall,
@@ -58,8 +372,17 @@ export function InputSection({
   const [alignHandles, setAlignHandles] = useState<
     { x: number; y: number }[] | null
   >(null);
+  const [showBackgroundControls, setShowBackgroundControls] = useState(
+    Boolean(settings.backgroundImage || settings.useBackgroundPhoto),
+  );
   const alignImgRef = useRef<HTMLImageElement | null>(null);
   const draggingHandleRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (settings.backgroundImage || settings.useBackgroundPhoto) {
+      setShowBackgroundControls(true);
+    }
+  }, [settings.backgroundImage, settings.useBackgroundPhoto]);
 
   // Open the aligner and initialize handles based on current image
   const openAligner = () => {
@@ -295,14 +618,46 @@ export function InputSection({
     );
   };
 
+  const convertInchesToCurrentUnit = (valueInches: number): number => {
+    if (settings.unit === 'cm') {
+      return Math.round(valueInches * 2.54 * 10) / 10;
+    }
+    return Math.round(valueInches * 10) / 10;
+  };
+
+  const clamp = (value: number, min: number, max: number): number =>
+    Math.min(Math.max(value, min), max);
+
+  const getObstructionDefaults = (type: ObstructionType): Partial<Obstruction> => {
+    const standard = settings.obstructionStandard ?? 'us';
+    const preset = obstructionPresets[standard][type];
+
+    const width = convertInchesToCurrentUnit(preset.widthIn);
+    const height = convertInchesToCurrentUnit(preset.heightIn);
+    const preferredLeft = convertInchesToCurrentUnit(preset.distanceFromLeftIn);
+    const preferredFloor = convertInchesToCurrentUnit(preset.distanceFromFloorIn);
+
+    const maxLeft = Math.max(0, wall.width - width);
+    const maxFloor = Math.max(0, wall.height - height);
+
+    return {
+      type,
+      width: Math.min(width, wall.width),
+      height: Math.min(height, wall.height),
+      distanceFromLeft: clamp(preferredLeft, 0, maxLeft),
+      distanceFromFloor: clamp(preferredFloor, 0, maxFloor),
+    };
+  };
+
   const addObstruction = () => {
+    const defaults = getObstructionDefaults('cabinet');
     const newObstruction: Obstruction = {
       id: `obstruction-${Date.now()}`,
-      type: 'cabinet',
-      width: 30,
-      height: 60,
-      distanceFromLeft: 0,
-      distanceFromFloor: 0,
+      type: defaults.type ?? 'cabinet',
+      width: defaults.width ?? 30,
+      height: defaults.height ?? 36,
+      distanceFromLeft: defaults.distanceFromLeft ?? 0,
+      distanceFromFloor: defaults.distanceFromFloor ?? 0,
     };
     onObstructionsChange([...obstructions, newObstruction]);
   };
@@ -365,7 +720,7 @@ export function InputSection({
           <Home className='h-6 w-6 text-blue-600' />
           Project Settings
         </h2>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4'>
           <div>
             <label className='block text-sm font-medium text-gray-700 mb-1'>
               Units
@@ -373,7 +728,11 @@ export function InputSection({
             <select
               value={settings.unit}
               onChange={(e) =>
-                onSettingsChange({ ...settings, unit: e.target.value as Unit })
+                onSettingsChange({
+                  ...settings,
+                  unit: e.target.value as Unit,
+                  autoUnitByStandard: false,
+                })
               }
               className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
               aria-label='Units'
@@ -443,147 +802,191 @@ export function InputSection({
               <option value='right'>Right Aligned</option>
             </select>
           </div>
-          {/* Background Photo Controls */}
-          <div className='md:col-span-2 lg:col-span-1'>
+          <div>
             <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Background Photo
+              Obstruction Standards
             </label>
-            <div className='flex items-center gap-2'>
-              <input
-                type='file'
-                accept='image/*'
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const dataUrl = await resizeImageFile(file, 1600, 1600);
-                  if (dataUrl) {
-                    onSettingsChange({
-                      ...settings,
-                      backgroundImage: dataUrl,
-                      backgroundOpacity: settings.backgroundOpacity ?? 0.6,
-                      useBackgroundPhoto: true,
-                    });
-                  } else {
-                    // fallback: clear
-                    onSettingsChange({
-                      ...settings,
-                      backgroundImage: undefined,
-                    });
-                  }
-                }}
-                className='text-sm'
-                placeholder='Choose a background photo'
-                title='Upload a background photo of your wall'
-              />
-              {settings.backgroundImage && (
-                <button
-                  type='button'
-                  onClick={() =>
-                    onSettingsChange({
-                      ...settings,
-                      backgroundImage: undefined,
-                      useBackgroundPhoto: false,
-                    })
-                  }
-                  className='px-3 py-1 bg-red-100 text-red-700 rounded'
-                >
-                  Remove
-                </button>
-              )}
-              {settings.backgroundImage && (
-                <button
-                  type='button'
-                  onClick={openAligner}
-                  className='px-3 py-1 bg-indigo-100 text-indigo-700 rounded'
-                >
-                  Align Wall
-                </button>
-              )}
-            </div>
-            <div className='flex items-center gap-3 mt-2'>
-              <label className='flex items-center gap-2 text-sm'>
-                <input
-                  type='checkbox'
-                  checked={settings.useBackgroundPhoto || false}
-                  onChange={(e) =>
-                    onSettingsChange({
-                      ...settings,
-                      useBackgroundPhoto: e.target.checked,
-                    })
-                  }
-                  className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
-                />
-                <span>Use photo background</span>
-              </label>
-            </div>
-            <div className='mt-3 grid grid-cols-1 gap-2'>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
-                Fit Mode
-              </label>
-              <select
-                value={settings.backgroundFitMode || 'cover'}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    backgroundFitMode: e.target.value as
-                      | 'cover'
-                      | 'contain'
-                      | 'fit-to-wall',
-                  })
-                }
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                aria-label='Background Fit Mode'
-              >
-                <option value='cover'>Cover (fill container)</option>
-                <option value='contain'>Contain (fit inside)</option>
-                <option value='fit-to-wall'>Fit-to-wall (map width)</option>
-              </select>
+            <select
+              value={settings.obstructionStandard ?? 'us'}
+              onChange={(e) => {
+                const nextStandard = e.target.value as ObstructionStandard;
+                const shouldAutoSyncUnits = settings.autoUnitByStandard ?? true;
+                onSettingsChange({
+                  ...settings,
+                  obstructionStandard: nextStandard,
+                  autoUnitByStandard: shouldAutoSyncUnits,
+                  unit: shouldAutoSyncUnits
+                    ? getDefaultUnitForStandard(nextStandard)
+                    : settings.unit,
+                });
+              }}
+              className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              aria-label='Obstruction Standards'
+            >
+              <option value='us'>US Typical</option>
+              <option value='eu'>EU Typical</option>
+              <option value='uk'>UK Typical</option>
+              <option value='au-nz'>AU/NZ Typical</option>
+              <option value='jp'>Japan Typical</option>
+            </select>
+            <p className='mt-1 text-xs text-gray-600'>
+              Units auto-follow this standard until you manually change Units.
+            </p>
+          </div>
+          {/* Background Photo Controls */}
+          <div className='md:col-span-2 lg:col-span-5 border border-gray-200 rounded-lg p-3'>
+            <button
+              type='button'
+              onClick={() => setShowBackgroundControls((prev) => !prev)}
+              className='w-full flex items-center justify-between text-left'
+            >
+              <span className='text-sm font-medium text-gray-700'>
+                Background Photo (optional)
+              </span>
+              <span className='text-sm text-blue-700'>
+                {showBackgroundControls ? 'Hide' : 'Show'}
+              </span>
+            </button>
 
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
-                  Manual Background Scale
-                </label>
-                <input
-                  type='number'
-                  value={settings.backgroundScale ?? 1}
-                  min={0.1}
-                  step={0.05}
-                  onChange={(e) =>
-                    onSettingsChange({
-                      ...settings,
-                      backgroundScale: parseFloat(e.target.value) || 1,
-                    })
-                  }
-                  className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                />
-                <p className='text-xs text-gray-500 mt-1'>
-                  When using Fit-to-wall, set scale to map the photo to wall
-                  measurements. 1 = no zoom.
-                </p>
+            {showBackgroundControls && (
+              <div className='mt-3'>
+                <div className='flex items-center gap-2'>
+                  <input
+                    type='file'
+                    accept='image/*'
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const dataUrl = await resizeImageFile(file, 1600, 1600);
+                      if (dataUrl) {
+                        onSettingsChange({
+                          ...settings,
+                          backgroundImage: dataUrl,
+                          backgroundOpacity: settings.backgroundOpacity ?? 0.6,
+                          useBackgroundPhoto: true,
+                        });
+                      } else {
+                        onSettingsChange({
+                          ...settings,
+                          backgroundImage: undefined,
+                        });
+                      }
+                    }}
+                    className='text-sm'
+                    placeholder='Choose a background photo'
+                    title='Upload a background photo of your wall'
+                  />
+                  {settings.backgroundImage && (
+                    <button
+                      type='button'
+                      onClick={() =>
+                        onSettingsChange({
+                          ...settings,
+                          backgroundImage: undefined,
+                          useBackgroundPhoto: false,
+                        })
+                      }
+                      className='px-3 py-1 bg-red-100 text-red-700 rounded'
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {settings.backgroundImage && (
+                    <button
+                      type='button'
+                      onClick={openAligner}
+                      className='px-3 py-1 bg-indigo-100 text-indigo-700 rounded'
+                    >
+                      Align Wall
+                    </button>
+                  )}
+                </div>
+                <div className='flex items-center gap-3 mt-2'>
+                  <label className='flex items-center gap-2 text-sm'>
+                    <input
+                      type='checkbox'
+                      checked={settings.useBackgroundPhoto || false}
+                      onChange={(e) =>
+                        onSettingsChange({
+                          ...settings,
+                          useBackgroundPhoto: e.target.checked,
+                        })
+                      }
+                      className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                    />
+                    <span>Use photo background</span>
+                  </label>
+                </div>
+                <div className='mt-3 grid grid-cols-1 gap-2'>
+                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    Fit Mode
+                  </label>
+                  <select
+                    value={settings.backgroundFitMode || 'cover'}
+                    onChange={(e) =>
+                      onSettingsChange({
+                        ...settings,
+                        backgroundFitMode: e.target.value as
+                          | 'cover'
+                          | 'contain'
+                          | 'fit-to-wall',
+                      })
+                    }
+                    className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    aria-label='Background Fit Mode'
+                  >
+                    <option value='cover'>Cover (fill container)</option>
+                    <option value='contain'>Contain (fit inside)</option>
+                    <option value='fit-to-wall'>Fit-to-wall (map width)</option>
+                  </select>
+
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Manual Background Scale
+                    </label>
+                    <input
+                      type='number'
+                      value={settings.backgroundScale ?? 1}
+                      min={0.1}
+                      step={0.05}
+                      onChange={(e) =>
+                        onSettingsChange({
+                          ...settings,
+                          backgroundScale: parseFloat(e.target.value) || 1,
+                        })
+                      }
+                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    />
+                    <p className='text-xs text-gray-500 mt-1'>
+                      When using Fit-to-wall, set scale to map the photo to wall
+                      measurements. 1 = no zoom.
+                    </p>
+                  </div>
+                </div>
+                <div className='mt-2'>
+                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    Photo Opacity
+                  </label>
+                  <input
+                    type='range'
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={settings.backgroundOpacity ?? 0.6}
+                    onChange={(e) =>
+                      onSettingsChange({
+                        ...settings,
+                        backgroundOpacity: parseFloat(e.target.value),
+                      })
+                    }
+                    className='w-full'
+                  />
+                  <div className='text-xs text-gray-500 mt-1'>
+                    Adjust how much the photo shows through the schematic.
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className='mt-2'>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
-                Photo Opacity
-              </label>
-              <input
-                type='range'
-                min={0}
-                max={1}
-                step={0.05}
-                value={settings.backgroundOpacity ?? 0.6}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    backgroundOpacity: parseFloat(e.target.value),
-                  })
-                }
-                className='w-full'
-              />
-              <div className='text-xs text-gray-500 mt-1'>
-                Adjust how much the photo shows through the schematic.
-              </div>
-            </div>
+            )}
           </div>
           {/* Aligner modal */}
           {alignOpen && alignHandles && (
@@ -1033,19 +1436,19 @@ export function InputSection({
               htmlFor='enable-stud-detection'
               className='text-sm font-medium text-gray-700'
             >
-              Enable Stud Detection & Visualization
+              Estimate Stud Positions & Visualization
             </label>
           </div>
 
           {settings.enableStudDetection && (
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 p-4 bg-blue-50 rounded-lg'>
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-3 p-4 bg-blue-50 rounded-lg'>
               <div>
                 <label className='block text-sm font-medium text-gray-700 mb-1'>
                   Standard Stud Spacing (
                   {settings.unit === 'inches' ? 'in' : 'cm'})
                 </label>
                 <select
-                  value={settings.studSpacing || 16}
+                  value={settings.studSpacing ?? (settings.unit === 'cm' ? 40.6 : 16)}
                   onChange={(e) =>
                     onSettingsChange({
                       ...settings,
@@ -1056,9 +1459,41 @@ export function InputSection({
                   aria-label='Standard Stud Spacing'
                   title='Standard Stud Spacing'
                 >
-                  <option value='16'>16" on center (standard)</option>
-                  <option value='24'>24" on center</option>
+                  {settings.unit === 'cm' ? (
+                    <>
+                      <option value='40.6'>40.6 cm on center (16")</option>
+                      <option value='61'>61 cm on center (24")</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value='16'>16" on center (standard)</option>
+                      <option value='24'>24" on center</option>
+                    </>
+                  )}
                 </select>
+              </div>
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  First Stud Offset ({settings.unit === 'inches' ? 'in' : 'cm'})
+                </label>
+                <input
+                  type='number'
+                  value={
+                    settings.firstStudOffset ??
+                    settings.studSpacing ??
+                    (settings.unit === 'cm' ? 40.6 : 16)
+                  }
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      firstStudOffset: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  min='0'
+                  step='0.5'
+                  placeholder={settings.unit === 'cm' ? 'e.g., 40.6' : 'e.g., 16'}
+                />
               </div>
               <div>
                 <label className='block text-sm font-medium text-gray-700 mb-1'>
@@ -1082,10 +1517,10 @@ export function InputSection({
                   className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                 />
               </div>
-              <div className='md:col-span-2 text-xs text-gray-600'>
+              <div className='md:col-span-3 text-xs text-gray-600'>
                 <strong>Tip:</strong> Use a stud finder to locate exact stud
-                positions and enter them above, or use standard spacing as a
-                guide.
+                positions and enter them above. If you only estimate, set
+                spacing + first offset to match your wall.
               </div>
             </div>
           )}
@@ -1148,6 +1583,19 @@ export function InputSection({
               {shelves.length} item{shelves.length !== 1 ? 's' : ''} added
             </p>
           )}
+        </div>
+        <div className='mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3'>
+          <p className='text-sm text-amber-900'>
+            <strong>Safety check:</strong> Add outlets, switches, and plumbing
+            zones as obstructions before drilling to reduce wire/pipe strike
+            risk.
+          </p>
+          <p className='text-xs text-amber-800 mt-1'>
+            New/updated obstruction types use{' '}
+            {getObstructionStandardLabel(settings.obstructionStandard ?? 'us')}{' '}
+            typical
+            default sizes and placement heights.
+          </p>
         </div>
         <div className='space-y-4'>
           {shelves.map((item, index) => (
@@ -1567,18 +2015,22 @@ export function InputSection({
               </label>
               <input
                 type='number'
-                value={settings.eyeLevelHeight || 57}
+                value={settings.eyeLevelHeight ?? (settings.unit === 'cm' ? 144.8 : 57)}
                 onChange={(e) =>
                   onSettingsChange({
                     ...settings,
-                    eyeLevelHeight: parseFloat(e.target.value) || 57,
+                    eyeLevelHeight:
+                      parseFloat(e.target.value) ||
+                      (settings.unit === 'cm' ? 144.8 : 57),
                   })
                 }
                 className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                placeholder='Standard is 57"'
+                placeholder={
+                  settings.unit === 'cm' ? 'Standard is 145 cm' : 'Standard is 57"'
+                }
                 title='Set the eye level height (center of artwork)'
-                min='40'
-                max='72'
+                min={settings.unit === 'cm' ? '100' : '40'}
+                max={settings.unit === 'cm' ? '183' : '72'}
                 step='1'
               />
               <p className='text-xs text-gray-600 mt-1'>
@@ -1633,11 +2085,13 @@ export function InputSection({
                   </label>
                   <select
                     value={obstruction.type}
-                    onChange={(e) =>
-                      updateObstruction(obstruction.id, {
-                        type: e.target.value as ObstructionType,
-                      })
-                    }
+                    onChange={(e) => {
+                      const nextType = e.target.value as ObstructionType;
+                      updateObstruction(
+                        obstruction.id,
+                        getObstructionDefaults(nextType),
+                      );
+                    }}
                     className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                   >
                     {obstructionTypes.map((type) => (
@@ -1646,6 +2100,22 @@ export function InputSection({
                       </option>
                     ))}
                   </select>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      updateObstruction(
+                        obstruction.id,
+                        getObstructionDefaults(obstruction.type),
+                      )
+                    }
+                    className='mt-2 text-xs text-blue-700 hover:text-blue-900 underline'
+                  >
+                    Apply{' '}
+                    {getObstructionStandardLabel(
+                      settings.obstructionStandard ?? 'us',
+                    )}{' '}
+                    standard preset
+                  </button>
                 </div>
                 <div>
                   <label className='block text-sm font-medium text-gray-700 mb-1'>
@@ -1727,6 +2197,15 @@ export function InputSection({
               No obstructions added. Your wall is clear!
             </div>
           )}
+          {obstructions.length > 0 &&
+            !obstructions.some((o) =>
+              ['outlet', 'switch', 'plumbing'].includes(o.type),
+            ) && (
+              <div className='rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
+                You have no electrical/plumbing obstructions marked yet.
+                Confirm outlet, switch, and pipe zones before drilling.
+              </div>
+            )}
         </div>
       </div>
     </div>

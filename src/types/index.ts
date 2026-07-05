@@ -26,6 +26,9 @@ export type ObstructionType =
   | 'door'
   | 'window'
   | 'tv'
+  | 'outlet'
+  | 'switch'
+  | 'plumbing'
   | 'other';
 
 export type WallMaterial = 'drywall' | 'plaster' | 'concrete' | 'brick';
@@ -33,6 +36,7 @@ export type WallMaterial = 'drywall' | 'plaster' | 'concrete' | 'brick';
 export type MountingType = 'floating' | 'bracketed' | 'l-bracket';
 
 export type Alignment = 'left' | 'center' | 'right';
+export type ObstructionStandard = 'us' | 'eu' | 'uk' | 'au-nz' | 'jp';
 
 export interface WallDimensions {
   width: number;
@@ -115,9 +119,12 @@ export interface ProjectSettings {
   wallMaterial: WallMaterial;
   mountingType: MountingType;
   alignment: Alignment;
+  obstructionStandard?: ObstructionStandard; // default obstruction sizes/placements
+  autoUnitByStandard?: boolean; // keep units synced to selected obstruction standard unless manually overridden
   studSpacing?: number; // 16 or 24 inches on center
   customStudLocations?: number[]; // custom stud positions from left edge
   enableStudDetection?: boolean;
+  firstStudOffset?: number; // estimated first stud distance from left wall
   galleryLayout?: GalleryLayout;
   eyeLevelHeight?: number; // default 57-60 inches for picture center
   autoArrange?: boolean; // enable/disable automatic arrangement
@@ -154,6 +161,7 @@ export interface HardwareRecommendation {
   itemId: string;
   itemType: ItemType;
   weight: number;
+  isEstimatedWeight: boolean;
   hardware: string;
   anchorType: string;
   screwSize: string;

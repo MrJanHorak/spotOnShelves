@@ -1,6 +1,6 @@
 import React from 'react';
 import { Wrench, Shield, AlertTriangle } from 'lucide-react';
-import { ProjectSettings } from '../types';
+import { MountingType, ProjectSettings, WallMaterial } from '../types';
 
 interface ToolsAndGuidanceProps {
   settings: ProjectSettings;
@@ -24,8 +24,11 @@ export function ToolsAndGuidance({ settings }: ToolsAndGuidanceProps) {
     }
   };
 
-  const getMountingAdvice = (mountingType: string, wallMaterial: string) => {
-    const advice = {
+  const getMountingAdvice = (
+    mountingType: MountingType,
+    wallMaterial: WallMaterial,
+  ) => {
+    const advice: Record<MountingType, Record<WallMaterial, string>> = {
       floating: {
         drywall: 'Use heavy-duty drywall anchors or locate studs for secure mounting. Floating shelves need strong support.',
         plaster: 'Use toggle bolts or molly bolts. Plaster can crack, so pre-drill carefully.',
@@ -46,16 +49,19 @@ export function ToolsAndGuidance({ settings }: ToolsAndGuidanceProps) {
       }
     };
 
-    return advice[mountingType as keyof typeof advice]?.[wallMaterial as keyof any] || 
-           'Follow manufacturer instructions for your specific shelf and wall type.';
+    return (
+      advice[mountingType][wallMaterial] ||
+      'Follow manufacturer instructions for your specific shelf and wall type.'
+    );
   };
 
   const getSafetyTips = (wallMaterial: string) => {
     const tips = [
       'Always wear safety glasses when drilling',
       'Check for electrical wires and plumbing behind walls',
-      'Use appropriate personal protective equipment'
-    ];
+        'Mark outlet, switch, and plumbing zones before final drilling marks',
+        'Use appropriate personal protective equipment'
+      ];
 
     if (wallMaterial === 'concrete' || wallMaterial === 'brick') {
       tips.push('Wear a dust mask when drilling masonry');
@@ -100,7 +106,7 @@ export function ToolsAndGuidance({ settings }: ToolsAndGuidanceProps) {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-3">Stud Finding Guide</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">Stud Estimation & Verification Guide</h3>
             <div className="space-y-2 text-blue-800 text-sm">
               <p><strong>Step 1:</strong> Turn on your stud finder and calibrate it according to the manufacturer's instructions.</p>
               <p><strong>Step 2:</strong> Starting from the left side of your planned shelf area, slowly slide the stud finder horizontally.</p>

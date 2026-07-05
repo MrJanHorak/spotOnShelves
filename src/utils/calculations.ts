@@ -628,7 +628,7 @@ export function calculateMaterials(
     }
   })();
 
-  const notes = `Calculated for mounting type: ${mountingType}. Weight capacities shown per shelf. Total capacity: ${totalCapacity} lbs.`;
+  const notes = `Calculated for mounting type: ${mountingType}. Weight capacities shown per shelf. Combined capacity (if evenly distributed across shelves): ${totalCapacity} lbs.`;
 
   return {
     brackets: totalBrackets,
@@ -640,21 +640,6 @@ export function calculateMaterials(
     maxWeightCapacity: totalCapacity,
     safetyFactor: 0.75,
   };
-}
-
-// Calculate eye-level height for pictures (57-60 inches is standard gallery height)
-export function calculateEyeLevelHeight(
-  wallHeight: number,
-  itemHeight: number,
-): number {
-  // Standard gallery height is 57 inches to center of artwork
-  const standardEyeLevel = 57;
-
-  // If wall is very tall, use standard height; otherwise adjust proportionally
-  const eyeLevel = wallHeight > 96 ? standardEyeLevel : wallHeight * 0.55;
-
-  // Return the floor distance to the BOTTOM of the item (center - half height)
-  return eyeLevel - itemHeight / 2;
 }
 
 // Calculate optimal placement for wall items (pictures, posters, etc.)
@@ -1378,7 +1363,8 @@ export function generateHardwareRecommendation(
   item: WallItem,
   wallMaterial: WallMaterial,
 ): HardwareRecommendation {
-  const weight = item.weight || estimateWeight(item);
+  const isEstimatedWeight = typeof item.weight !== 'number';
+  const weight = item.weight ?? estimateWeight(item);
   const notes: string[] = [];
   let hardware = '';
   let anchorType = '';
@@ -1493,6 +1479,7 @@ export function generateHardwareRecommendation(
     itemId: item.id,
     itemType: item.type,
     weight,
+    isEstimatedWeight,
     hardware,
     anchorType,
     screwSize,

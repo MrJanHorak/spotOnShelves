@@ -25,6 +25,7 @@ interface SchematicDisplayProps {
   selectedShelfId?: string | null;
   onHoverShelf?: (id: string | null) => void;
   studSpacing?: number;
+  firstStudOffset?: number;
   customStudLocations?: number[];
   enableStudDetection?: boolean;
   isCompact?: boolean;
@@ -48,6 +49,7 @@ export function SchematicDisplay({
   selectedShelfId = null,
   onHoverShelf,
   studSpacing = 16,
+  firstStudOffset = 16,
   customStudLocations,
   enableStudDetection = false,
   isCompact = false,
@@ -217,6 +219,9 @@ export function SchematicDisplay({
       door: '#10B981', // green
       window: '#3B82F6', // blue
       tv: '#8B5CF6', // purple
+      outlet: '#06B6D4', // cyan
+      switch: '#14B8A6', // teal
+      plumbing: '#0EA5E9', // sky
       other: '#6B7280', // gray
     };
     return colors[type as keyof typeof colors] || colors.other;
@@ -226,7 +231,7 @@ export function SchematicDisplay({
   const studLocations = enableStudDetection
     ? customStudLocations && customStudLocations.length > 0
       ? customStudLocations
-      : calculateStudLocations(wall.width, studSpacing, studSpacing)
+      : calculateStudLocations(wall.width, studSpacing, firstStudOffset)
     : [];
 
   // --- Alignment handles: create and pointer handlers after layout computed ---
@@ -300,6 +305,8 @@ export function SchematicDisplay({
               width={containerWidth}
               height={containerHeight}
               className='overflow-visible relative z-10'
+              role='img'
+              aria-label='Wall schematic showing item placements, spacing, and obstructions'
             >
               <style>{`
                 .bracket-marker { opacity: 0; transform: translateY(6px); }
@@ -792,7 +799,9 @@ export function SchematicDisplay({
                                   const nextPx = positions[bi + 1];
                                   const spacing = nextPx - px;
                                   const midX = (px + nextPx) / 2;
-                                  const y = item.distanceFromFloor + 2.5;
+                                  const y =
+                                    item.distanceFromFloor +
+                                    (bi % 2 === 0 ? 6 : 9);
 
                                   return (
                                     <g key={`spacing-${item.id}-${bi}`}>
@@ -891,22 +900,22 @@ export function SchematicDisplay({
           <div className='w-full lg:w-64 space-y-4'>
             <div>
               <h3 className='font-semibold text-gray-900 mb-2'>Legend</h3>
-              <div className='space-y-2 text-sm'>
-                <div className='flex items-center gap-2'>
+              <div className='flex flex-wrap gap-2 text-sm'>
+                <div className='flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1 rounded'>
                   <div className='w-4 h-4 bg-gray-100 border-2 border-gray-600 rounded'></div>
                   <span>Wall</span>
                 </div>
-                <div className='flex items-center gap-2'>
+                <div className='flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1 rounded'>
                   <div className='w-4 h-4 bg-green-600 rounded'></div>
                   <span>Shelves</span>
                 </div>
                 {enableStudDetection && studLocations.length > 0 && (
-                  <div className='flex items-center gap-2'>
+                  <div className='flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1 rounded'>
                     <div className='w-4 h-4 bg-yellow-300 border border-yellow-600 rounded'></div>
-                    <span>Studs ({studLocations.length})</span>
+                    <span>Estimated studs ({studLocations.length})</span>
                   </div>
                 )}
-                <div className='flex items-center gap-2'>
+                <div className='flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1 rounded'>
                   <div className='w-4 h-4 bg-indigo-500 rounded'></div>
                   <span>Bracket Spacing</span>
                 </div>
@@ -918,19 +927,19 @@ export function SchematicDisplay({
               <h4 className='font-medium text-gray-900 mb-3'>
                 Display Options
               </h4>
-              <div className='space-y-2'>
+              <div className='flex flex-wrap gap-2'>
                 {enableStudDetection && studLocations.length > 0 && (
-                  <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                  <label className='inline-flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 border border-gray-200 px-2 py-1.5 rounded transition-colors'>
                     <input
                       type='checkbox'
                       checked={showStuds}
                       onChange={(e) => setShowStuds(e.target.checked)}
                       className='rounded border-gray-300 text-green-600 focus:ring-green-500'
                     />
-                    <span>Show stud locations</span>
+                    <span>Show estimated stud locations</span>
                   </label>
                 )}
-                <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                <label className='inline-flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 border border-gray-200 px-2 py-1.5 rounded transition-colors'>
                   <input
                     type='checkbox'
                     checked={showBracketDetails}
@@ -939,7 +948,7 @@ export function SchematicDisplay({
                   />
                   <span>Show bracket measurements</span>
                 </label>
-                <label className='flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors'>
+                <label className='inline-flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 border border-gray-200 px-2 py-1.5 rounded transition-colors'>
                   <input
                     type='checkbox'
                     checked={showSpacing}
@@ -954,10 +963,13 @@ export function SchematicDisplay({
             {obstructions.length > 0 && (
               <div>
                 <h4 className='font-medium text-gray-900 mb-2'>Obstructions</h4>
-                <div className='space-y-1 text-sm'>
+                <div className='flex flex-wrap gap-2 text-sm'>
                   {Array.from(new Set(obstructions.map((o) => o.type))).map(
                     (type) => (
-                      <div key={type} className='flex items-center gap-2'>
+                      <div
+                        key={type}
+                        className='flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1 rounded'
+                      >
                         <div
                           className='w-4 h-4 rounded opacity-60'
                           style={{ backgroundColor: getObstructionColor(type) }}
