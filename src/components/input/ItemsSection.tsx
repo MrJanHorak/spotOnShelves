@@ -44,21 +44,24 @@ export function ItemsSection({
           </p>
         )}
       </div>
-      <div className='mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3'>
-        <p className='text-sm text-amber-900'>
-          <strong>Safety check:</strong> Add outlets, switches, and plumbing zones as
-          obstructions before drilling to reduce wire/pipe strike risk.
-        </p>
-        <p className='text-xs text-amber-800 mt-1'>
-          New/updated obstruction types use{' '}
-          {getObstructionStandardLabel(settings.obstructionStandard ?? 'us')} typical
-          default sizes and placement heights.
-        </p>
-        <p className='text-xs text-blue-700 mt-1'>
-          Confidence: presets are starting points and should be measured/edited
-          to match your actual wall.
-        </p>
-      </div>
+      {!settings.noUtilityZonesConfirmed && (
+        <div className='mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3'>
+          <p className='text-sm text-amber-900'>
+            <strong>Safety check:</strong> Add outlets, switches, and plumbing
+            zones as obstructions before drilling to reduce wire/pipe strike
+            risk.
+          </p>
+          <p className='text-xs text-amber-800 mt-1'>
+            New/updated obstruction types use{' '}
+            {getObstructionStandardLabel(settings.obstructionStandard ?? 'us')}{' '}
+            typical default sizes and placement heights.
+          </p>
+          <p className='text-xs text-blue-700 mt-1'>
+            Confidence: presets are starting points and should be measured/edited
+            to match your actual wall.
+          </p>
+        </div>
+      )}
       <div className='space-y-4'>
         {shelves.map((item, index) => (
           <div key={item.id} className='border border-gray-200 rounded-lg p-4'>

@@ -119,6 +119,7 @@ export interface ProjectSettings {
   wallMaterial: WallMaterial;
   mountingType: MountingType;
   alignment: Alignment;
+  noUtilityZonesConfirmed?: boolean; // wall is confirmed clear of outlet/switch/plumbing zones
   obstructionStandard?: ObstructionStandard; // default obstruction sizes/placements
   autoUnitByStandard?: boolean; // keep units synced to selected obstruction standard unless manually overridden
   studSpacing?: number; // 16 or 24 inches on center

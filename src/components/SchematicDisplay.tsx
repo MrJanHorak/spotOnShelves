@@ -140,7 +140,8 @@ export function SchematicDisplay({
   const showSidebar = !isCompact;
   const baseWidth = Math.min(700, availableWidth);
   const baseHeight = Math.round((350 / 700) * baseWidth);
-  const compactScale = 0.3;
+  const compactScale = 0.42;
+  const showDetailedOverlays = !isCompact;
   const containerWidth = Math.round(
     isCompact ? baseWidth * compactScale : baseWidth,
   );
@@ -389,6 +390,7 @@ export function SchematicDisplay({
 
                 {/* Stud Indicators */}
                 {showStuds &&
+                  showDetailedOverlays &&
                   studLocations.map((studPos, index) => {
                     const x = offsetX + studPos * scale;
                     return (
@@ -427,27 +429,31 @@ export function SchematicDisplay({
                   })}
 
                 {/* Wall Dimensions */}
-                <text
-                  x={offsetX + scaledWidth / 2}
-                  y={offsetY - 10}
-                  textAnchor='middle'
-                  className='text-sm font-medium'
-                  fill='#374151'
-                >
-                  {formatMeasurement(wall.width, unit)}
-                </text>
-                <text
-                  x={offsetX - 10}
-                  y={offsetY + scaledHeight / 2}
-                  textAnchor='middle'
-                  className='text-sm font-medium'
-                  fill='#374151'
-                  transform={`rotate(-90 ${offsetX - 10} ${
-                    offsetY + scaledHeight / 2
-                  })`}
-                >
-                  {formatMeasurement(wall.height, unit)}
-                </text>
+                {showDetailedOverlays && (
+                  <>
+                    <text
+                      x={offsetX + scaledWidth / 2}
+                      y={offsetY - 10}
+                      textAnchor='middle'
+                      className='text-sm font-medium'
+                      fill='#374151'
+                    >
+                      {formatMeasurement(wall.width, unit)}
+                    </text>
+                    <text
+                      x={offsetX - 10}
+                      y={offsetY + scaledHeight / 2}
+                      textAnchor='middle'
+                      className='text-sm font-medium'
+                      fill='#374151'
+                      transform={`rotate(-90 ${offsetX - 10} ${
+                        offsetY + scaledHeight / 2
+                      })`}
+                    >
+                      {formatMeasurement(wall.height, unit)}
+                    </text>
+                  </>
+                )}
 
                 {/* Obstructions */}
                 {obstructions.map((obstruction) => (
@@ -469,26 +475,28 @@ export function SchematicDisplay({
                       strokeWidth='2'
                       rx='2'
                     />
-                    <text
-                      x={
-                        offsetX +
-                        (obstruction.distanceFromLeft + obstruction.width / 2) *
-                          scale
-                      }
-                      y={
-                        offsetY +
-                        (wall.height -
-                          obstruction.distanceFromFloor -
-                          obstruction.height / 2) *
-                          scale
-                      }
-                      textAnchor='middle'
-                      className='text-xs font-medium'
-                      fill={getObstructionColor(obstruction.type)}
-                      dominantBaseline='middle'
-                    >
-                      {obstruction.type.toUpperCase()}
-                    </text>
+                    {showDetailedOverlays && (
+                      <text
+                        x={
+                          offsetX +
+                          (obstruction.distanceFromLeft + obstruction.width / 2) *
+                            scale
+                        }
+                        y={
+                          offsetY +
+                          (wall.height -
+                            obstruction.distanceFromFloor -
+                            obstruction.height / 2) *
+                            scale
+                        }
+                        textAnchor='middle'
+                        className='text-xs font-medium'
+                        fill={getObstructionColor(obstruction.type)}
+                        dominantBaseline='middle'
+                      >
+                        {obstruction.type.toUpperCase()}
+                      </text>
+                    )}
                   </g>
                 ))}
 
@@ -596,28 +604,30 @@ export function SchematicDisplay({
                           opacity={item.type === 'shelf' ? 1 : 0.85}
                         />
                       )}
-                      <text
-                        x={
-                          offsetX +
-                          (item.distanceFromLeft + item.width / 2) * scale
-                        }
-                        y={
-                          offsetY +
-                          (wall.height -
-                            item.distanceFromFloor -
-                            itemHeight / 2) *
-                            scale
-                        }
-                        textAnchor='middle'
-                        className='text-xs font-bold'
-                        fill='white'
-                        dominantBaseline='middle'
-                      >
-                        {itemLabel}
-                      </text>
+                      {showDetailedOverlays && (
+                        <text
+                          x={
+                            offsetX +
+                            (item.distanceFromLeft + item.width / 2) * scale
+                          }
+                          y={
+                            offsetY +
+                            (wall.height -
+                              item.distanceFromFloor -
+                              itemHeight / 2) *
+                              scale
+                          }
+                          textAnchor='middle'
+                          className='text-xs font-bold'
+                          fill='white'
+                          dominantBaseline='middle'
+                        >
+                          {itemLabel}
+                        </text>
+                      )}
 
                       {/* Weight/capacity badge */}
-                      {(itemCapacity || item.weight) && (
+                      {(itemCapacity || item.weight) && showDetailedOverlays && (
                         <g>
                           <rect
                             x={
@@ -667,36 +677,41 @@ export function SchematicDisplay({
                       )}
 
                       {/* Item measurement lines */}
-                      <line
-                        x1={offsetX}
-                        y1={
-                          offsetY +
-                          (wall.height - item.distanceFromFloor) * scale
-                        }
-                        x2={offsetX + item.distanceFromLeft * scale}
-                        y2={
-                          offsetY +
-                          (wall.height - item.distanceFromFloor) * scale
-                        }
-                        stroke='#6B7280'
-                        strokeWidth='1'
-                        strokeDasharray='2,2'
-                      />
-                      <line
-                        x1={offsetX + item.distanceFromLeft * scale}
-                        y1={offsetY + scaledHeight}
-                        x2={offsetX + item.distanceFromLeft * scale}
-                        y2={
-                          offsetY +
-                          (wall.height - item.distanceFromFloor) * scale
-                        }
-                        stroke='#6B7280'
-                        strokeWidth='1'
-                        strokeDasharray='2,2'
-                      />
+                      {showDetailedOverlays && (
+                        <>
+                          <line
+                            x1={offsetX}
+                            y1={
+                              offsetY +
+                              (wall.height - item.distanceFromFloor) * scale
+                            }
+                            x2={offsetX + item.distanceFromLeft * scale}
+                            y2={
+                              offsetY +
+                              (wall.height - item.distanceFromFloor) * scale
+                            }
+                            stroke='#6B7280'
+                            strokeWidth='1'
+                            strokeDasharray='2,2'
+                          />
+                          <line
+                            x1={offsetX + item.distanceFromLeft * scale}
+                            y1={offsetY + scaledHeight}
+                            x2={offsetX + item.distanceFromLeft * scale}
+                            y2={
+                              offsetY +
+                              (wall.height - item.distanceFromFloor) * scale
+                            }
+                            stroke='#6B7280'
+                            strokeWidth='1'
+                            strokeDasharray='2,2'
+                          />
+                        </>
+                      )}
 
                       {/* Bracket markers (for shelves only) */}
                       {item.type === 'shelf' &&
+                        showDetailedOverlays &&
                         (() => {
                           // Derive brackets for this shelf using current settings
                           const perShelf =

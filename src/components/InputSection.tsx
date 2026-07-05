@@ -299,6 +299,28 @@ export function InputSection({
               locale and can be overridden anytime.
             </p>
           </div>
+          <div className='md:col-span-2 lg:col-span-5 rounded-lg border border-gray-200 bg-gray-50 p-3'>
+            <label className='inline-flex items-start gap-3 text-sm text-gray-800 cursor-pointer'>
+              <input
+                type='checkbox'
+                checked={settings.noUtilityZonesConfirmed ?? false}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    noUtilityZonesConfirmed: e.target.checked,
+                  })
+                }
+                className='mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+              />
+              <span>
+                <strong>This wall is clear of power/plumbing zones</strong>
+                <span className='block text-xs text-gray-600 mt-1'>
+                  Use this only after you verify there are no outlets, switches,
+                  or plumbing risks on this wall. Safety reminders will be hidden.
+                </span>
+              </span>
+            </label>
+          </div>
           {/* Background Photo Controls */}
           <div className='md:col-span-2 lg:col-span-5 border border-gray-200 rounded-lg p-3'>
             <button

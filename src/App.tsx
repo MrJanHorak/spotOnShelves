@@ -97,6 +97,7 @@ function App() {
     wallMaterial: 'drywall',
     mountingType: 'floating',
     alignment: 'center',
+    noUtilityZonesConfirmed: false,
     obstructionStandard: detectedStandard,
     autoUnitByStandard: true,
     studSpacing: toUnitValue(16, defaultUnit),
@@ -127,6 +128,7 @@ function App() {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
   const compactLockUntilRef = useRef(0);
+  const userScrollIntentUntilRef = useRef(0);
   const [isSchematicCompact, setIsSchematicCompact] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(false);
@@ -146,6 +148,8 @@ function App() {
   const hasUtilityObstruction = obstructions.some((o) =>
     ['outlet', 'switch', 'plumbing'].includes(o.type),
   );
+  const hasUtilitySafetyCoverage =
+    hasUtilityObstruction || Boolean(settings.noUtilityZonesConfirmed);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -324,6 +328,7 @@ function App() {
       setIsSchematicCompact(false);
       lastScrollTopRef.current = 0;
       compactLockUntilRef.current = 0;
+      userScrollIntentUntilRef.current = 0;
       return;
     }
 
@@ -335,9 +340,34 @@ function App() {
     const ENTER_COMPACT_SCROLL_TOP = 240;
     const EXIT_COMPACT_SCROLL_TOP = 24;
     const TOGGLE_LOCK_MS = 450;
+    const USER_INTENT_WINDOW_MS = 900;
+
+    const markUserScrollIntent = () => {
+      userScrollIntentUntilRef.current = performance.now() + USER_INTENT_WINDOW_MS;
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key;
+      if (
+        key === 'ArrowDown' ||
+        key === 'ArrowUp' ||
+        key === 'PageDown' ||
+        key === 'PageUp' ||
+        key === 'Home' ||
+        key === 'End' ||
+        key === ' ' ||
+        key === 'Spacebar'
+      ) {
+        markUserScrollIntent();
+      }
+    };
 
     const updateCompactMode = () => {
       const now = performance.now();
+      if (now > userScrollIntentUntilRef.current) {
+        lastScrollTopRef.current = rootEl.scrollTop;
+        return;
+      }
       if (now < compactLockUntilRef.current) return;
 
       const scrollTop = rootEl.scrollTop;
@@ -360,9 +390,25 @@ function App() {
 
     lastScrollTopRef.current = rootEl.scrollTop;
     updateCompactMode();
+    rootEl.addEventListener('wheel', markUserScrollIntent, { passive: true });
+    rootEl.addEventListener('touchstart', markUserScrollIntent, {
+      passive: true,
+    });
+    rootEl.addEventListener('touchmove', markUserScrollIntent, {
+      passive: true,
+    });
+    rootEl.addEventListener('pointerdown', markUserScrollIntent, {
+      passive: true,
+    });
+    window.addEventListener('keydown', onKeyDown);
     rootEl.addEventListener('scroll', updateCompactMode, { passive: true });
 
     return () => {
+      rootEl.removeEventListener('wheel', markUserScrollIntent);
+      rootEl.removeEventListener('touchstart', markUserScrollIntent);
+      rootEl.removeEventListener('touchmove', markUserScrollIntent);
+      rootEl.removeEventListener('pointerdown', markUserScrollIntent);
+      window.removeEventListener('keydown', onKeyDown);
       rootEl.removeEventListener('scroll', updateCompactMode);
     };
   }, [result.shelves.length]);
@@ -526,6 +572,7 @@ function App() {
         obstructionStandard: resolvedStandard,
         autoUnitByStandard,
         unit: resolvedUnit,
+        noUtilityZonesConfirmed: project.settings.noUtilityZonesConfirmed ?? false,
       });
       setCurrentProjectId(project.id);
       setCurrentProjectName(project.name);
@@ -891,7 +938,7 @@ function App() {
                 </div>
               )}
 
-              {errors.length === 0 && !hasUtilityObstruction && (
+              {errors.length === 0 && !hasUtilitySafetyCoverage && (
                 <div className='mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4'>
                   <p className='text-sm text-amber-900'>
                     <strong>Safety reminder:</strong> No outlet/switch/plumbing
