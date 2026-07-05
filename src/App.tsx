@@ -81,6 +81,19 @@ function toUnitValue(valueInches: number, unit: Unit): number {
   return valueInches;
 }
 
+const QUICK_START_DISMISSED_KEY = 'spotOnShelves_quickStartDismissed';
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === 'true';
+  } catch {
+    return fallback;
+  }
+}
+
 function App() {
   const detectedStandard = detectObstructionStandardFromBrowser();
   const defaultUnit = getDefaultUnitForStandard(detectedStandard);
@@ -136,7 +149,10 @@ function App() {
   const [isSchematicCompact, setIsSchematicCompact] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(false);
-  const [showQuickStart, setShowQuickStart] = useState(true);
+  const [showQuickStart, setShowQuickStart] = useState(
+    !readStoredBoolean(QUICK_START_DISMISSED_KEY, false),
+  );
+  const isHeaderCompact = true;
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveProjectNameDraft, setSaveProjectNameDraft] = useState('');
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<
@@ -281,6 +297,46 @@ function App() {
     const timer = window.setTimeout(() => setToast(null), 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        QUICK_START_DISMISSED_KEY,
+        String(!showQuickStart),
+      );
+    } catch {
+      // ignore storage failures
+    }
+  }, [showQuickStart]);
+
+  useEffect(() => {
+    const anyDialogOpen =
+      showTerms ||
+      showHelpGuide ||
+      showSaveDialog ||
+      showLoadDialog ||
+      Boolean(pendingDeleteProjectId);
+    if (!anyDialogOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (showSaveDialog) setShowSaveDialog(false);
+      else if (pendingDeleteProjectId) setPendingDeleteProjectId(null);
+      else if (showLoadDialog) setShowLoadDialog(false);
+      else if (showHelpGuide) setShowHelpGuide(false);
+      else if (showTerms) setShowTerms(false);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    showTerms,
+    showHelpGuide,
+    showSaveDialog,
+    showLoadDialog,
+    pendingDeleteProjectId,
+  ]);
 
   useEffect(() => {
     if (result.shelves.length === 0) {
@@ -575,17 +631,35 @@ function App() {
     <div className='min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50'>
       {/* Header */}
       <header className='bg-white shadow-sm border-b border-gray-200'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3'>
+        <div
+          className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${
+            isHeaderCompact ? 'py-2.5' : 'py-4'
+          }`}
+        >
           <div className='flex items-center justify-between gap-3 flex-wrap'>
             <div className='flex items-center gap-3'>
-              <div className='p-1.5 bg-blue-600 rounded-lg'>
-                <Calculator className='h-6 w-6 text-white' />
+              <div
+                className={`bg-blue-600 rounded-lg ${
+                  isHeaderCompact ? 'p-1.5' : 'p-2'
+                }`}
+              >
+                <Calculator
+                  className={`${isHeaderCompact ? 'h-6 w-6' : 'h-7 w-7'} text-white`}
+                />
               </div>
               <div>
-                <h1 className='text-2xl font-bold text-gray-900 leading-tight'>
+                <h1
+                  className={`font-bold text-gray-900 leading-tight ${
+                    isHeaderCompact ? 'text-2xl' : 'text-[1.75rem]'
+                  }`}
+                >
                   Spot On Shelves
                 </h1>
-                <p className='text-sm text-gray-600 hidden lg:block'>
+                <p
+                  className={`text-sm text-gray-600 hidden lg:block ${
+                    isHeaderCompact ? '' : 'mt-0.5'
+                  }`}
+                >
                   Plan and hang shelves with precision and confidence
                 </p>
               </div>
@@ -878,9 +952,19 @@ function App() {
       {/* Load Project Dialog */}
       {showLoadDialog && (
         <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden'>
+          <div
+            className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden'
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='load-project-title'
+          >
             <div className='p-6 border-b'>
-              <h2 className='text-2xl font-bold text-gray-900'>Load Project</h2>
+              <h2
+                id='load-project-title'
+                className='text-2xl font-bold text-gray-900'
+              >
+                Load Project
+              </h2>
             </div>
             <div className='p-6 overflow-y-auto max-h-[60vh]'>
               {savedProjects.length === 0 ? (
@@ -1026,7 +1110,15 @@ function App() {
       {/* Terms of Service Modal */}
       {showTerms && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 relative animate-fadeInUp'>
+          <div
+            className='bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 relative animate-fadeInUp'
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='terms-modal-title'
+          >
+            <h2 id='terms-modal-title' className='sr-only'>
+              Terms of Service
+            </h2>
             <button
               onClick={() => setShowTerms(false)}
               className='absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold focus:outline-none'
@@ -1042,9 +1134,14 @@ function App() {
       {/* Help Guide Modal */}
       {showHelpGuide && (
         <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto'>
+          <div
+            className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto'
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='help-guide-title'
+          >
             <div className='p-6 border-b flex items-center justify-between'>
-              <h2 className='text-xl font-bold text-gray-900'>
+              <h2 id='help-guide-title' className='text-xl font-bold text-gray-900'>
                 How to Use Spot On Shelves
               </h2>
               <button
@@ -1110,9 +1207,16 @@ function App() {
       {/* Save Project Dialog */}
       {showSaveDialog && (
         <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full'>
+          <div
+            className='bg-white rounded-xl shadow-2xl max-w-md w-full'
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='save-project-title'
+          >
             <div className='p-6 border-b'>
-              <h2 className='text-xl font-bold text-gray-900'>Save Project</h2>
+              <h2 id='save-project-title' className='text-xl font-bold text-gray-900'>
+                Save Project
+              </h2>
             </div>
             <div className='p-6'>
               <label className='block text-sm font-medium text-gray-700 mb-2'>
@@ -1148,9 +1252,14 @@ function App() {
       {/* Delete Project Confirmation */}
       {pendingDeleteProjectId && (
         <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-md w-full'>
+          <div
+            className='bg-white rounded-xl shadow-2xl max-w-md w-full'
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='delete-project-title'
+          >
             <div className='p-6 border-b'>
-              <h2 className='text-xl font-bold text-gray-900'>
+              <h2 id='delete-project-title' className='text-xl font-bold text-gray-900'>
                 Delete Project?
               </h2>
             </div>
@@ -1194,6 +1303,7 @@ function App() {
         onClick={() => setShowHelpGuide(true)}
         className='fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 flex items-center justify-center'
         aria-label='Open how-to guide'
+        aria-haspopup='dialog'
         title='How to use this app'
       >
         <HelpCircle className='h-6 w-6' />
