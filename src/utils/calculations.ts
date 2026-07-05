@@ -740,19 +740,6 @@ export function calculateWallItemPlacement(
   };
 }
 
-// Get abbreviated item type label
-function getItemTypeAbbreviation(type: ItemType): string {
-  const abbreviations: Record<ItemType, string> = {
-    shelf: 'S',
-    picture: 'P',
-    poster: 'Po',
-    mirror: 'M',
-    tv: 'T',
-    artpiece: 'A',
-  };
-  return abbreviations[type] || '?';
-}
-
 // Apply different gallery layout patterns
 function applyGalleryLayout(
   wall: WallDimensions,
@@ -827,7 +814,7 @@ function applyGridLayout(
   eyeLevelHeight: number,
   obstructions: Obstruction[],
   existingPlacements: ShelfPlacement[],
-  horizontalSpacing: number = 6,
+  _horizontalSpacing: number = 6,
   verticalSpacing: number = 6,
   distributeEvenly: boolean = false,
 ): ShelfPlacement[] {
@@ -1000,8 +987,8 @@ function applySalonLayout(
   items: WallItem[],
   margin: number,
   eyeLevelHeight: number,
-  obstructions: Obstruction[],
-  existingPlacements: ShelfPlacement[],
+  _obstructions: Obstruction[],
+  _existingPlacements: ShelfPlacement[],
 ): ShelfPlacement[] {
   const placements: ShelfPlacement[] = [];
 

@@ -20,7 +20,6 @@ interface ItemPositioningProps {
 
 export function ItemPositioning({
   item,
-  index,
   unit,
   wallWidth,
   wallHeight,
