@@ -7,11 +7,12 @@ import {
   CalculationResult,
   Obstruction,
 } from '../types';
+import { PDFFont, PDFPage } from 'pdf-lib';
 
 function drawPrintScaleCheck(
-  page: any,
-  font: any,
-  fontBold: any,
+  page: PDFPage,
+  font: PDFFont,
+  fontBold: PDFFont,
   x: number,
   y: number
 ) {
