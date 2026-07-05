@@ -17,6 +17,13 @@ import { SchematicDisplay } from './components/SchematicDisplay';
 import { MeasurementOutput } from './components/MeasurementOutput';
 import { ToolsAndGuidance } from './components/ToolsAndGuidance';
 import TermsOfService from './components/TermsOfService';
+import { HelpGuideModal } from './components/modals/HelpGuideModal';
+import {
+  DeleteProjectDialog,
+  LoadProjectDialog,
+  SaveProjectDialog,
+  ToastMessage,
+} from './components/modals/ProjectDialogs';
 import {
   WallDimensions,
   ShelfDimensions,
@@ -24,7 +31,6 @@ import {
   ProjectSettings,
   CalculationResult,
   WallItem,
-  ObstructionStandard,
   Unit,
 } from './types';
 import {
@@ -47,34 +53,9 @@ import {
   importProjectFromJSON,
   SavedProject,
 } from './utils/storage';
-
-function detectObstructionStandardFromBrowser(): ObstructionStandard {
-  if (typeof navigator === 'undefined') return 'us';
-
-  const localeCandidates = [
-    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
-    navigator.language,
-    Intl.DateTimeFormat().resolvedOptions().locale,
-  ].filter(Boolean) as string[];
-
-  for (const locale of localeCandidates) {
-    const match = locale.match(/[-_]([A-Za-z]{2})\b/);
-    const region = match?.[1]?.toUpperCase();
-    if (!region) continue;
-    if (region === 'US' || region === 'CA') return 'us';
-    if (region === 'GB' || region === 'UK' || region === 'IE') return 'uk';
-    if (region === 'AU' || region === 'NZ') return 'au-nz';
-    if (region === 'JP') return 'jp';
-    return 'eu';
-  }
-
-  return 'us';
-}
-
-function getDefaultUnitForStandard(standard: ObstructionStandard): Unit {
-  if (standard === 'us') return 'inches';
-  return 'cm';
-}
+import { getDefaultUnitForStandard } from './utils/obstructionStandards';
+import { detectObstructionStandardFromBrowser } from './utils/localeDefaults';
+import { reportAppError } from './utils/errorReporting';
 
 function toUnitValue(valueInches: number, unit: Unit): number {
   if (unit === 'cm') return Math.round(valueInches * 2.54 * 10) / 10;
@@ -507,7 +488,14 @@ function App() {
         showToast('Project saved successfully.', 'success');
         setShowSaveDialog(false);
       } catch (error) {
-        console.error('Failed to save project:', error);
+        reportAppError(error, {
+          scope: 'save-project',
+          details: {
+            currentProjectId,
+            shelvesCount: shelves.length,
+            obstructionsCount: obstructions.length,
+          },
+        });
         showToast(
           'Failed to save project. Local storage may be full (try removing large background photos).',
           'error',
@@ -582,7 +570,13 @@ function App() {
         deleteProject(temp.id);
         showToast('Project exported as JSON.', 'success');
       } catch (error) {
-        console.error('Failed to export project:', error);
+        reportAppError(error, {
+          scope: 'export-project',
+          details: {
+            hasCurrentProject: Boolean(currentProjectId),
+            shelvesCount: shelves.length,
+          },
+        });
         showToast(
           'Failed to export project. Please save without a large background image and try again.',
           'error',
@@ -614,7 +608,12 @@ function App() {
               );
             }
           } catch (error) {
-            console.error('Failed to import project:', error);
+            reportAppError(error, {
+              scope: 'import-project',
+              details: {
+                fileName: file.name,
+              },
+            });
             showToast(
               'Failed to import project. Local storage may be full or unavailable.',
               'error',
@@ -754,13 +753,13 @@ function App() {
                     <div className='mt-4'>
                       <div className='bg-white rounded-xl shadow-lg overflow-hidden'>
                         <div
-                          className={`flex border-b border-gray-200 bg-gray-50 ${
+                          className={`flex overflow-x-auto border-b border-gray-200 bg-gray-50 ${
                             isSchematicCompact ? 'mt-6 -mt-[2px]' : ''
                           }`}
                         >
                           <button
                             onClick={() => setActiveTab('setup')}
-                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                            className={`min-w-[12rem] sm:flex-1 px-4 sm:px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                               activeTab === 'setup'
                                 ? 'bg-white text-blue-600 border-b-2 border-blue-600'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -771,7 +770,7 @@ function App() {
                           </button>
                           <button
                             onClick={() => setActiveTab('measurements')}
-                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                            className={`min-w-[12rem] sm:flex-1 px-4 sm:px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                               activeTab === 'measurements'
                                 ? 'bg-white text-green-600 border-b-2 border-green-600'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -785,7 +784,7 @@ function App() {
                           </button>
                           <button
                             onClick={() => setActiveTab('materials')}
-                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                            className={`min-w-[12rem] sm:flex-1 px-4 sm:px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                               activeTab === 'materials'
                                 ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -799,7 +798,7 @@ function App() {
                           </button>
                           <button
                             onClick={() => setActiveTab('guidance')}
-                            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                            className={`min-w-[12rem] sm:flex-1 px-4 sm:px-6 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                               activeTab === 'guidance'
                                 ? 'bg-white text-purple-600 border-b-2 border-purple-600'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -818,7 +817,7 @@ function App() {
 
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
               {showQuickStart && (
-                <div className='mb-6 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start justify-between gap-3'>
+                <div className='mb-6 bg-blue-50 border border-blue-200 rounded-xl p-3 flex flex-col sm:flex-row items-start justify-between gap-3'>
                   <p className='text-sm text-blue-900'>
                     <strong>Quick start:</strong> 1) Set wall size and material
                     2) Add shelves/items and obstructions 3) Use Measurements
@@ -949,80 +948,13 @@ function App() {
         </div>
       </main>
 
-      {/* Load Project Dialog */}
-      {showLoadDialog && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div
-            className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden'
-            role='dialog'
-            aria-modal='true'
-            aria-labelledby='load-project-title'
-          >
-            <div className='p-6 border-b'>
-              <h2
-                id='load-project-title'
-                className='text-2xl font-bold text-gray-900'
-              >
-                Load Project
-              </h2>
-            </div>
-            <div className='p-6 overflow-y-auto max-h-[60vh]'>
-              {savedProjects.length === 0 ? (
-                <p className='text-gray-600 text-center py-8'>
-                  No saved projects yet. Save your current project to see it
-                  here.
-                </p>
-              ) : (
-                <div className='space-y-3'>
-                  {savedProjects.map((project) => (
-                    <div
-                      key={project.id}
-                      className='border border-gray-200 rounded-lg p-4 hover:border-blue-500 transition-colors'
-                    >
-                      <div className='flex items-start justify-between'>
-                        <div className='flex-1'>
-                          <h3 className='font-semibold text-gray-900'>
-                            {project.name}
-                          </h3>
-                          <p className='text-sm text-gray-600 mt-1'>
-                            {project.shelves.length} shelf(s),{' '}
-                            {project.obstructions.length} obstruction(s)
-                          </p>
-                          <p className='text-xs text-gray-500 mt-1'>
-                            Saved: {new Date(project.savedAt).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className='flex gap-2 ml-4'>
-                          <button
-                            onClick={() => handleLoadProject(project.id)}
-                            className='px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm'
-                          >
-                            Load
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProject(project.id)}
-                            className='px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm'
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className='p-6 border-t bg-gray-50'>
-              <button
-                onClick={() => setShowLoadDialog(false)}
-                className='w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LoadProjectDialog
+        open={showLoadDialog}
+        savedProjects={savedProjects}
+        onClose={() => setShowLoadDialog(false)}
+        onLoadProject={handleLoadProject}
+        onDeleteProject={handleDeleteProject}
+      />
 
       {/* Footer */}
       <footer className='bg-gray-900 text-white mt-16 border-t border-gray-800'>
@@ -1131,171 +1063,23 @@ function App() {
         </div>
       )}
 
-      {/* Help Guide Modal */}
-      {showHelpGuide && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div
-            className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto'
-            role='dialog'
-            aria-modal='true'
-            aria-labelledby='help-guide-title'
-          >
-            <div className='p-6 border-b flex items-center justify-between'>
-              <h2 id='help-guide-title' className='text-xl font-bold text-gray-900'>
-                How to Use Spot On Shelves
-              </h2>
-              <button
-                onClick={() => setShowHelpGuide(false)}
-                className='text-gray-500 hover:text-gray-700 text-2xl font-bold'
-                aria-label='Close help guide'
-              >
-                &times;
-              </button>
-            </div>
-            <div className='p-6 space-y-4 text-sm text-gray-700'>
-              <p className='text-gray-800'>
-                <strong>First-time setup checklist</strong>
-              </p>
-              <ol className='list-decimal pl-5 space-y-3'>
-                <li>
-                  <strong>Start in Setup & Configuration.</strong> Choose units,
-                  wall material, mounting type, and alignment. If your wall
-                  includes outlets/switches/plumbing, select the obstruction
-                  standard closest to your region.
-                </li>
-                <li>
-                  <strong>Enter accurate wall size.</strong> Measure total wall
-                  width and height first; everything else is positioned against
-                  these values.
-                </li>
-                <li>
-                  <strong>Add your items.</strong> Add shelves and/or wall art.
-                  For best recommendations, enter each item&apos;s real weight
-                  when known. If you leave weight blank, the app estimates it.
-                </li>
-                <li>
-                  <strong>Mark obstructions before drilling.</strong> Add doors,
-                  windows, beds, cabinets, and utility zones (outlets/switches/
-                  plumbing). This prevents invalid placements and improves safety.
-                </li>
-                <li>
-                  <strong>Check the schematic and warnings.</strong> If you see
-                  overlap warnings, adjust size/position or use manual
-                  positioning until conflicts are gone.
-                </li>
-                <li>
-                  <strong>Use Measurements tab to mark the wall.</strong> Follow
-                  it top-to-bottom: left offset, floor offset, then bracket
-                  spacing/positions.
-                </li>
-                <li>
-                  <strong>Use Materials & Export for install prep.</strong>
-                  Review capacity/hardware guidance, then export the PDF plan or
-                  drilling templates.
-                </li>
-              </ol>
-              <div className='rounded-lg bg-blue-50 border border-blue-200 p-3 text-blue-900'>
-                <strong>Pro tip:</strong> Background photo tools are optional.
-                Leave that section collapsed unless you want visual alignment
-                against a real wall photo.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <HelpGuideModal open={showHelpGuide} onClose={() => setShowHelpGuide(false)} />
 
-      {/* Save Project Dialog */}
-      {showSaveDialog && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div
-            className='bg-white rounded-xl shadow-2xl max-w-md w-full'
-            role='dialog'
-            aria-modal='true'
-            aria-labelledby='save-project-title'
-          >
-            <div className='p-6 border-b'>
-              <h2 id='save-project-title' className='text-xl font-bold text-gray-900'>
-                Save Project
-              </h2>
-            </div>
-            <div className='p-6'>
-              <label className='block text-sm font-medium text-gray-700 mb-2'>
-                Project name
-              </label>
-              <input
-                type='text'
-                value={saveProjectNameDraft}
-                onChange={(e) => setSaveProjectNameDraft(e.target.value)}
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent'
-                placeholder='Enter project name'
-                autoFocus
-              />
-            </div>
-            <div className='p-6 border-t bg-gray-50 flex gap-3'>
-              <button
-                onClick={() => setShowSaveDialog(false)}
-                className='flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => saveProjectWithName(saveProjectNameDraft)}
-                className='flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SaveProjectDialog
+        open={showSaveDialog}
+        projectName={saveProjectNameDraft}
+        onChangeProjectName={setSaveProjectNameDraft}
+        onClose={() => setShowSaveDialog(false)}
+        onSave={() => saveProjectWithName(saveProjectNameDraft)}
+      />
 
-      {/* Delete Project Confirmation */}
-      {pendingDeleteProjectId && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50'>
-          <div
-            className='bg-white rounded-xl shadow-2xl max-w-md w-full'
-            role='dialog'
-            aria-modal='true'
-            aria-labelledby='delete-project-title'
-          >
-            <div className='p-6 border-b'>
-              <h2 id='delete-project-title' className='text-xl font-bold text-gray-900'>
-                Delete Project?
-              </h2>
-            </div>
-            <div className='p-6 text-sm text-gray-700'>
-              This action cannot be undone.
-            </div>
-            <div className='p-6 border-t bg-gray-50 flex gap-3'>
-              <button
-                onClick={() => setPendingDeleteProjectId(null)}
-                className='flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteProject}
-                className='flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteProjectDialog
+        open={Boolean(pendingDeleteProjectId)}
+        onClose={() => setPendingDeleteProjectId(null)}
+        onDelete={confirmDeleteProject}
+      />
 
-      {/* Toast */}
-      {toast && (
-        <div className='fixed bottom-20 right-4 z-50'>
-          <div
-            className={`px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white ${
-              toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
-            }`}
-          >
-            {toast.message}
-          </div>
-        </div>
-      )}
+      {toast && <ToastMessage message={toast.message} type={toast.type} />}
 
       {/* Floating Help Button */}
       <button

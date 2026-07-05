@@ -65,6 +65,7 @@ export function SchematicDisplay({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const schematicPaneRef = useRef<HTMLDivElement>(null);
   // Alignment handles state (created after layout calculations)
   // (alignment handles removed — feature disabled per user request)
 
@@ -94,6 +95,19 @@ export function SchematicDisplay({
   const [showStuds, setShowStuds] = useState(true);
   const [showBracketDetails, setShowBracketDetails] = useState(false);
   const [showSpacing, setShowSpacing] = useState(true);
+  const [availableWidth, setAvailableWidth] = useState(700);
+
+  useEffect(() => {
+    const updateAvailableWidth = () => {
+      const paneWidth = schematicPaneRef.current?.clientWidth;
+      if (!paneWidth) return;
+      setAvailableWidth(Math.max(240, paneWidth));
+    };
+
+    updateAvailableWidth();
+    window.addEventListener('resize', updateAvailableWidth);
+    return () => window.removeEventListener('resize', updateAvailableWidth);
+  }, []);
 
   // local mount state to trigger staggered animations
   let mounted = false;
@@ -111,8 +125,8 @@ export function SchematicDisplay({
   }
   // Calculate container and wall dimensions
   const showSidebar = !isCompact;
-  const baseWidth = 700;
-  const baseHeight = 350;
+  const baseWidth = Math.min(700, availableWidth);
+  const baseHeight = Math.round((350 / 700) * baseWidth);
   const compactScale = 0.3;
   const containerWidth = Math.round(
     isCompact ? baseWidth * compactScale : baseWidth,
@@ -141,9 +155,18 @@ export function SchematicDisplay({
   const defaultX = (baseWidth - scaledWidth) / 2;
   const defaultY = (baseHeight - scaledHeight) / 2;
 
-  // Wall position: use saved alignment if using background photo, otherwise center
-  const wallX = useBackgroundPhoto ? (wallAlignmentX ?? defaultX) : defaultX;
-  const wallY = useBackgroundPhoto ? (wallAlignmentY ?? defaultY) : defaultY;
+  const unclampedWallX = useBackgroundPhoto
+    ? (wallAlignmentX ?? defaultX)
+    : defaultX;
+  const unclampedWallY = useBackgroundPhoto
+    ? (wallAlignmentY ?? defaultY)
+    : defaultY;
+  const maxWallX = Math.max(0, baseWidth - scaledWidth);
+  const maxWallY = Math.max(0, baseHeight - scaledHeight);
+
+  // Clamp wall position so narrow/mobile layouts never render off-canvas
+  const wallX = Math.min(Math.max(unclampedWallX, 0), maxWallX);
+  const wallY = Math.min(Math.max(unclampedWallY, 0), maxWallY);
 
   // Apply compact scaling to positions for rendering
   const offsetX = wallX * (isCompact ? compactScale : 1);
@@ -264,7 +287,7 @@ export function SchematicDisplay({
         }`}
       >
         {/* SVG Schematic */}
-        <div className='flex-1'>
+        <div ref={schematicPaneRef} className='flex-1'>
           <div
             ref={containerRef}
             id='schematic-container'

@@ -16,6 +16,18 @@ import {
   HardwareRecommendation,
   GalleryLayout,
 } from '../types';
+import { convertUnits, formatMeasurement } from './calculations/unitConversion';
+import {
+  calculateStudLocations,
+  findNearestStud,
+} from './calculations/studLayout';
+import {
+  checkItemObstructionConflicts,
+  checkPlacedItemConflicts,
+} from './calculations/conflicts';
+
+export { convertUnits, formatMeasurement, calculateStudLocations, findNearestStud };
+export { checkItemObstructionConflicts, checkPlacedItemConflicts };
 
 // Helper function to check if two rectangles overlap
 function checkOverlap(
@@ -401,29 +413,6 @@ export function calculateOptimalPlacement(
   };
 }
 
-export function convertUnits(
-  value: number,
-  fromUnit: 'inches' | 'cm',
-  toUnit: 'inches' | 'cm',
-): number {
-  if (fromUnit === toUnit) return value;
-
-  if (fromUnit === 'inches' && toUnit === 'cm') {
-    return value * 2.54;
-  } else if (fromUnit === 'cm' && toUnit === 'inches') {
-    return value / 2.54;
-  }
-
-  return value;
-}
-
-export function formatMeasurement(
-  value: number,
-  unit: 'inches' | 'cm',
-): string {
-  return `${value.toFixed(1)} ${unit === 'inches' ? 'in' : 'cm'}`;
-}
-
 // Load-bearing capacity calculation
 export function calculateLoadCapacity(
   wallMaterial: WallMaterial,
@@ -498,44 +487,6 @@ export function calculateLoadCapacity(
   notes.push(`Safe working load (75% safety factor): ${maxWeight} lbs`);
 
   return { maxWeight, safetyFactor, notes };
-}
-
-// Calculate stud locations based on standard spacing
-export function calculateStudLocations(
-  wallWidth: number,
-  studSpacing: number = 16,
-  startOffset: number = 0,
-): number[] {
-  const studs: number[] = [];
-  let position = startOffset;
-
-  while (position <= wallWidth) {
-    studs.push(position);
-    position += studSpacing;
-  }
-
-  return studs;
-}
-
-// Find nearest stud to a given position
-export function findNearestStud(
-  position: number,
-  studLocations: number[],
-): { stud: number; distance: number } | null {
-  if (studLocations.length === 0) return null;
-
-  let nearest = studLocations[0];
-  let minDistance = Math.abs(position - studLocations[0]);
-
-  for (const stud of studLocations) {
-    const distance = Math.abs(position - stud);
-    if (distance < minDistance) {
-      minDistance = distance;
-      nearest = stud;
-    }
-  }
-
-  return { stud: nearest, distance: minDistance };
 }
 
 // Material calculator: estimates brackets, screws and anchors needed
@@ -1601,89 +1552,4 @@ function generateInstallationInstructions(
   );
 
   return instructions;
-}
-
-// Helper function to check for conflicts between placed items and obstructions
-export function checkItemObstructionConflicts(
-  placements: ShelfPlacement[],
-  obstructions: Obstruction[],
-): string[] {
-  const errors: string[] = [];
-
-  obstructions.forEach((obs, obsIndex) => {
-    placements.forEach((placement, placementIndex) => {
-      const itemHeight = placement.height || 1;
-
-      if (
-        checkOverlap(
-          {
-            x: obs.distanceFromLeft,
-            y: obs.distanceFromFloor,
-            width: obs.width,
-            height: obs.height,
-          },
-          {
-            x: placement.distanceFromLeft,
-            y: placement.distanceFromFloor,
-            width: placement.width,
-            height: itemHeight,
-          },
-        )
-      ) {
-        const obsType = obs.type.charAt(0).toUpperCase() + obs.type.slice(1);
-        const itemType =
-          placement.type.charAt(0).toUpperCase() + placement.type.slice(1);
-        errors.push(
-          `${obsType} ${obsIndex + 1} overlaps with ${itemType} ${
-            placementIndex + 1
-          } - please reposition`,
-        );
-      }
-    });
-  });
-
-  return errors;
-}
-
-// Helper function to check for conflicts between placed items themselves
-export function checkPlacedItemConflicts(
-  placements: ShelfPlacement[],
-): string[] {
-  const errors: string[] = [];
-
-  for (let i = 0; i < placements.length; i++) {
-    for (let j = i + 1; j < placements.length; j++) {
-      const item1 = placements[i];
-      const item2 = placements[j];
-      const item1Height = item1.height || 1;
-      const item2Height = item2.height || 1;
-
-      if (
-        checkOverlap(
-          {
-            x: item1.distanceFromLeft,
-            y: item1.distanceFromFloor,
-            width: item1.width,
-            height: item1Height,
-          },
-          {
-            x: item2.distanceFromLeft,
-            y: item2.distanceFromFloor,
-            width: item2.width,
-            height: item2Height,
-          },
-        )
-      ) {
-        const type1 = item1.type.charAt(0).toUpperCase() + item1.type.slice(1);
-        const type2 = item2.type.charAt(0).toUpperCase() + item2.type.slice(1);
-        errors.push(
-          `${type1} ${i + 1} overlaps with ${type2} ${
-            j + 1
-          } - please reposition or resize`,
-        );
-      }
-    }
-  }
-
-  return errors;
 }
