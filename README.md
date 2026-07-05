@@ -88,11 +88,11 @@ Start by configuring your project settings:
 ### 2. Wall Dimensions
 Enter your wall's width and height measurements. These form the canvas for your shelf planning.
 
-### 3. Adding Shelves
-- Click "Add Shelf" to create new shelf entries
-- Enter width and depth for each shelf
-- The system supports multiple shelves of different sizes
-- Shelves are automatically sorted by width for optimal placement
+### 3. Adding Items
+- Click "Add Item" to create shelves or wall-art entries (picture, poster, mirror, TV, art piece)
+- Enter dimensions and weight (when known) for each item
+- The system supports multiple mixed item types with independent positioning
+- Weight guidance is labeled as user-entered vs estimated for clarity
 
 ### 4. Wall Obstructions (Optional)
 Add any obstacles on your wall:
@@ -126,7 +126,12 @@ Once your inputs are valid, the application provides:
 ### Key Components
 
 #### [`InputSection`](src/components/InputSection.tsx)
-Handles all user inputs including wall dimensions, shelf specifications, obstructions, and project settings.
+Orchestrates setup inputs and delegates major UI blocks to focused subcomponents:
+- [`input/ItemsSection.tsx`](src/components/input/ItemsSection.tsx)
+- [`input/WallDimensionsSection.tsx`](src/components/input/WallDimensionsSection.tsx)
+- [`input/ObstructionsSection.tsx`](src/components/input/ObstructionsSection.tsx)
+- [`input/PositioningControlsSection.tsx`](src/components/input/PositioningControlsSection.tsx)
+- [`input/useBackgroundAligner.ts`](src/components/input/useBackgroundAligner.ts) for photo alignment state/logic
 
 #### [`SchematicDisplay`](src/components/SchematicDisplay.tsx)
 Renders the visual wall diagram with SVG, showing proportional relationships between wall, shelves, and obstructions.
@@ -140,11 +145,13 @@ Provides customized tool recommendations, mounting advice, and safety guidelines
 ### Core Logic
 
 #### [`calculations.ts`](src/utils/calculations.ts)
-Contains the main algorithms for:
+Primary entry point for calculation logic with shared submodules:
 - Input validation
 - Optimal shelf placement calculation
 - Obstruction collision detection
-- Unit conversion utilities
+- Unit conversion utilities via [`calculations/unitConversion.ts`](src/utils/calculations/unitConversion.ts)
+- Stud layout helpers via [`calculations/studLayout.ts`](src/utils/calculations/studLayout.ts)
+- Conflict helpers via [`calculations/conflicts.ts`](src/utils/calculations/conflicts.ts)
 
 #### Types and Interfaces
 Comprehensive TypeScript definitions in [`types/index.ts`](src/types/index.ts) ensure type safety across the application.
@@ -181,6 +188,22 @@ Fully responsive layout that adapts to:
 - Desktop computers (optimal experience)
 - Tablets (touch-friendly interface)
 - Mobile phones (compact but functional)
+
+## ✅ Release QA Checklist (Recommended)
+
+Before a public release, run this quick pass:
+- iOS Safari + Android Chrome: verify schematic fits viewport with no horizontal clipping
+- Small laptop: verify sticky schematic + tab bar behavior while scrolling
+- Save / load / delete / import / export flows with and without background photos
+- Print a drilling template at 100% scale and confirm the 1 in / 2 cm scale-check bars
+- Validate accessibility basics: keyboard tab order, modal close, visible focus states
+
+## ⚠️ Known Limits
+
+- Stud overlays are estimates unless you enter measured stud locations.
+- Obstruction standards are default starting presets and should be adjusted to measured values.
+- Locale-based defaults are inferred from browser locale and may need manual override.
+- The app does not detect hidden wiring/plumbing; always scan and verify before drilling.
 
 ## 🔄 Future Enhancements
 

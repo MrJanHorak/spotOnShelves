@@ -28,6 +28,7 @@ interface MaterialCalculatorProps {
   wall?: WallDimensions;
   obstructions?: Obstruction[];
   result?: CalculationResult;
+  onPrepareSchematicExport?: () => Promise<(() => void) | void> | (() => void) | void;
 }
 
 export function MaterialCalculator({
@@ -41,6 +42,7 @@ export function MaterialCalculator({
   wall,
   obstructions = [],
   result,
+  onPrepareSchematicExport,
 }: MaterialCalculatorProps) {
   const [exporting, setExporting] = useState(false);
   const [pdfPageSize, setPdfPageSize] = useState<'A4' | 'Letter'>('Letter');
@@ -142,6 +144,14 @@ export function MaterialCalculator({
       )}
 
       {/* Export buttons */}
+      <div className='rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
+        <p>
+          <strong>Before drilling:</strong> verify stud and utility locations
+          with real tools, then print templates at 100% scale (no fit/shrink)
+          and confirm the PDF scale-check bars measure exactly.
+        </p>
+      </div>
+
       <div className='mt-4 flex items-center gap-3 flex-wrap'>
         <label className='text-sm font-medium'>PDF Size:</label>
         <select
@@ -206,7 +216,11 @@ export function MaterialCalculator({
           onClick={async () => {
             if (exporting || !wall || !result) return;
             setExporting(true);
+            let restoreSchematicView: (() => void) | void;
             try {
+              if (onPrepareSchematicExport) {
+                restoreSchematicView = await onPrepareSchematicExport();
+              }
               const container = document.getElementById(
                 'schematic-container'
               ) as HTMLElement | null;
@@ -248,7 +262,7 @@ export function MaterialCalculator({
 
               const canvas = await html2canvas(container as HTMLElement, {
                 backgroundColor: '#ffffff',
-                scale: 2, // High quality 2x
+                scale: 3, // Higher quality capture to reduce PDF graininess
                 useCORS: true, // Allow cross-origin images
                 allowTaint: true,
                 logging: false,
@@ -299,6 +313,9 @@ export function MaterialCalculator({
                 text: 'Export failed. Please try again.',
               });
             } finally {
+              if (typeof restoreSchematicView === 'function') {
+                restoreSchematicView();
+              }
               setExporting(false);
             }
           }}

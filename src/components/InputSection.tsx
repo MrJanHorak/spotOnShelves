@@ -294,6 +294,10 @@ export function InputSection({
             <p className='mt-1 text-xs text-gray-600'>
               Units auto-follow this standard until you manually change Units.
             </p>
+            <p className='mt-1 text-xs text-blue-700'>
+              Confidence: this standard is initially inferred from browser
+              locale and can be overridden anytime.
+            </p>
           </div>
           {/* Background Photo Controls */}
           <div className='md:col-span-2 lg:col-span-5 border border-gray-200 rounded-lg p-3'>
@@ -627,6 +631,10 @@ export function InputSection({
                 <strong>Tip:</strong> Use a stud finder to locate exact stud
                 positions and enter them above. If you only estimate, set
                 spacing + first offset to match your wall.
+              </div>
+              <div className='md:col-span-3 text-xs text-blue-700'>
+                Confidence: stud lines are estimates unless you provide custom
+                measured stud locations.
               </div>
             </div>
           )}

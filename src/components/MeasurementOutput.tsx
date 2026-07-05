@@ -36,6 +36,16 @@ export function MeasurementOutput({
         Precise Measurements
       </h2>
 
+      <div className='rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900'>
+        <p className='font-semibold mb-2'>Pre-drill checklist</p>
+        <ul className='space-y-1'>
+          <li>• Confirm stud positions with a real stud finder</li>
+          <li>• Scan for wires/pipes before making final marks</li>
+          <li>• Re-check level and clearances after penciling marks</li>
+          <li>• If using printed templates, verify the print scale bars first</li>
+        </ul>
+      </div>
+
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
         {/* Measurements */}
         <div>

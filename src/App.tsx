@@ -626,6 +626,19 @@ function App() {
     input.click();
   };
 
+  const prepareSchematicExport = async () => {
+    const wasCompact = isSchematicCompact;
+    if (wasCompact) {
+      setIsSchematicCompact(false);
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
+    }
+    return () => {
+      if (wasCompact) {
+        setIsSchematicCompact(true);
+      }
+    };
+  };
+
   return (
     <div className='min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50'>
       {/* Header */}
@@ -935,6 +948,7 @@ function App() {
                         wall={wall}
                         obstructions={obstructions}
                         result={result}
+                        onPrepareSchematicExport={prepareSchematicExport}
                       />
                     )}
 

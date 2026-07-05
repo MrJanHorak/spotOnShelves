@@ -105,9 +105,22 @@ export function SchematicDisplay({
     };
 
     updateAvailableWidth();
+
+    const pane = schematicPaneRef.current;
+    let observer: ResizeObserver | null = null;
+    if (pane && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        updateAvailableWidth();
+      });
+      observer.observe(pane);
+    }
+
     window.addEventListener('resize', updateAvailableWidth);
-    return () => window.removeEventListener('resize', updateAvailableWidth);
-  }, []);
+    return () => {
+      window.removeEventListener('resize', updateAvailableWidth);
+      if (observer) observer.disconnect();
+    };
+  }, [isCompact]);
 
   // local mount state to trigger staggered animations
   let mounted = false;

@@ -54,6 +54,10 @@ export function ItemsSection({
           {getObstructionStandardLabel(settings.obstructionStandard ?? 'us')} typical
           default sizes and placement heights.
         </p>
+        <p className='text-xs text-blue-700 mt-1'>
+          Confidence: presets are starting points and should be measured/edited
+          to match your actual wall.
+        </p>
       </div>
       <div className='space-y-4'>
         {shelves.map((item, index) => (

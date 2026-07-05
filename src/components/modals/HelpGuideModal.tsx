@@ -66,7 +66,8 @@ export function HelpGuideModal({ open, onClose }: HelpGuideModalProps) {
             <li>
               <strong>Use Materials & Export for install prep.</strong> Review
               capacity/hardware guidance, then export the PDF plan or drilling
-              templates.
+              templates. Print templates at 100% scale and verify the PDF
+              scale-check bars before drilling.
             </li>
           </ol>
 
@@ -97,6 +98,20 @@ export function HelpGuideModal({ open, onClose }: HelpGuideModalProps) {
             <strong>Pro tip:</strong> Background photo tools are optional. Leave
             that section collapsed unless you want visual alignment against a real
             wall photo.
+          </div>
+
+          <div className='rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1'>
+            <p className='text-gray-900'>
+              <strong>Known limits</strong>
+            </p>
+            <p>
+              Stud overlays and obstruction presets are estimates unless you
+              enter measured values.
+            </p>
+            <p>
+              The app helps planning and marking, but it does not detect hidden
+              electrical/plumbing paths behind walls.
+            </p>
           </div>
         </div>
       </div>
