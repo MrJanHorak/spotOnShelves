@@ -13,7 +13,11 @@ export default function TermsOfService() {
         <li>
           All data is stored locally in your browser unless you export it.
         </li>
-        <li>No personal data is collected or shared by the developer.</li>
+        <li>
+          Optional anonymous usage analytics are collected only if you accept
+          analytics cookies.
+        </li>
+        <li>No personal data is intentionally collected or sold.</li>
         <li>
           Use this app at your own risk. Always follow safety guidelines for
           installations.

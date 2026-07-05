@@ -45,6 +45,27 @@
       content="Plan, visualize, and install wall shelves with precision. Get optimal placements, avoid obstructions, and follow expert installation guidance."
     />
     <meta name="twitter:image" content="/src/assets/shelves-favicon.svg" />
+    <!-- Google Analytics (GA4): loaded early with consent denied by default -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      window.gtag = gtag;
+      gtag('js', new Date());
+      gtag('consent', 'default', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        functionality_storage: 'granted',
+        security_storage: 'granted',
+      });
+    </script>
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-5BZ8KVWKBB"
+    ></script>
   </head>
   <body>
     <div id="root" role="main"></div>

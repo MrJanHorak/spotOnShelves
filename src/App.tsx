@@ -62,7 +62,17 @@ function toUnitValue(valueInches: number, unit: Unit): number {
   return valueInches;
 }
 
+const GA_MEASUREMENT_ID = 'G-5BZ8KVWKBB';
 const QUICK_START_DISMISSED_KEY = 'spotOnShelves_quickStartDismissed';
+const COOKIE_CONSENT_KEY = 'spotOnShelves_cookieConsent_v1';
+type CookieConsentChoice = 'accepted' | 'declined';
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+    __spotOnGaConfigured?: boolean;
+  }
+}
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   if (typeof window === 'undefined') return fallback;
@@ -72,6 +82,31 @@ function readStoredBoolean(key: string, fallback: boolean): boolean {
     return raw === 'true';
   } catch {
     return fallback;
+  }
+}
+
+function readCookieConsentChoice(): CookieConsentChoice | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(COOKIE_CONSENT_KEY);
+    return raw === 'accepted' || raw === 'declined' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function applyAnalyticsConsent(choice: CookieConsentChoice) {
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
+  const analyticsGranted = choice === 'accepted';
+  window.gtag('consent', 'update', {
+    analytics_storage: analyticsGranted ? 'granted' : 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+  });
+  if (analyticsGranted && !window.__spotOnGaConfigured) {
+    window.gtag('config', GA_MEASUREMENT_ID, { anonymize_ip: true });
+    window.__spotOnGaConfigured = true;
   }
 }
 
@@ -134,6 +169,11 @@ function App() {
   const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(
     !readStoredBoolean(QUICK_START_DISMISSED_KEY, false),
+  );
+  const [cookieConsentChoice, setCookieConsentChoice] =
+    useState<CookieConsentChoice | null>(() => readCookieConsentChoice());
+  const [showCookieBanner, setShowCookieBanner] = useState(
+    cookieConsentChoice === null,
   );
   const isHeaderCompact = true;
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -294,6 +334,22 @@ function App() {
       // ignore storage failures
     }
   }, [showQuickStart]);
+
+  useEffect(() => {
+    if (!cookieConsentChoice) return;
+    applyAnalyticsConsent(cookieConsentChoice);
+  }, [cookieConsentChoice]);
+
+  const handleCookieConsent = (choice: CookieConsentChoice) => {
+    setCookieConsentChoice(choice);
+    setShowCookieBanner(false);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(COOKIE_CONSENT_KEY, choice);
+    } catch {
+      // ignore storage failures
+    }
+  };
 
   useEffect(() => {
     const anyDialogOpen =
@@ -1080,9 +1136,9 @@ function App() {
               Legal & Privacy
             </p>
             <p className='text-gray-500 text-xs'>
-              This site does not collect personal data except for project data
-              you choose to save locally in your browser. No data is transmitted
-              to external servers.
+              This site stores project data locally in your browser. Optional
+              anonymous usage analytics are only enabled if you accept the
+              analytics cookie consent prompt.
             </p>
             <p className='text-gray-500 text-xs mt-2'>
               By using this site, you agree to the{' '}
@@ -1139,6 +1195,42 @@ function App() {
         onClose={() => setPendingDeleteProjectId(null)}
         onDelete={confirmDeleteProject}
       />
+
+      {showCookieBanner && (
+        <div className='fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[min(42rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white shadow-2xl p-4'>
+          <p className='text-sm text-gray-900'>
+            We use Google Analytics to understand feature usage and improve the
+            app. Analytics stays off unless you accept.
+          </p>
+          <div className='mt-2 text-xs text-gray-600'>
+            You can review our{' '}
+            <button
+              type='button'
+              onClick={() => setShowTerms(true)}
+              className='underline hover:text-gray-800'
+            >
+              Terms of Service
+            </button>{' '}
+            for privacy details.
+          </div>
+          <div className='mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end'>
+            <button
+              type='button'
+              onClick={() => handleCookieConsent('declined')}
+              className='px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium'
+            >
+              Decline analytics
+            </button>
+            <button
+              type='button'
+              onClick={() => handleCookieConsent('accepted')}
+              className='px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium'
+            >
+              Accept analytics
+            </button>
+          </div>
+        </div>
+      )}
 
       {toast && <ToastMessage message={toast.message} type={toast.type} />}
 
